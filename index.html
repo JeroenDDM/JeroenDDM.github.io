@@ -135,14 +135,17 @@
                 try {
                     // Configure the Platform API Client
                     client.setEnvironment(pcEnvironment);
+                    console.log('Environment set to:', pcEnvironment);
                     
                     // Get authentication token
                     try {
                         const token = await new Promise((resolve, reject) => {
                             clientApp.getAuthToken((err, token) => {
                                 if (err) {
+                                    console.error('Auth error:', err);
                                     reject(err);
                                 } else {
+                                    console.log('Auth token received');
                                     resolve(token);
                                 }
                             });
@@ -153,6 +156,7 @@
                         }
                         
                         client.setAccessToken(token);
+                        console.log('Access token set successfully');
                     } catch (authError) {
                         throw new Error(`Authentication failed: ${authError.message}`);
                     }
@@ -166,6 +170,7 @@
                     const interactionId = urlParams.get('conversationId') || urlParams.get('interactionId');
                     if (interactionId) {
                         currentInteractionId = interactionId;
+                        console.log('Current interaction ID:', currentInteractionId);
                     }
 
                 } catch (e) {
@@ -188,13 +193,28 @@
         // Fetch and display queues
         async function refreshQueues() {
             try {
+                console.log('Fetching queues...');
                 const queuesResult = await routingApi.getRoutingQueues({ pageSize: 100 });
+                console.log('Queues received:', queuesResult);
+
+                if (!queuesResult || !queuesResult.entities || queuesResult.entities.length === 0) {
+                    document.getElementById('queues-container').innerHTML = `
+                        <div style="color: orange; text-align: center; padding: 20px;">
+                            No queues found. You might not have access to view any queues.<br>
+                            Please check your permissions.
+                        </div>
+                    `;
+                    return;
+                }
+
                 const container = document.getElementById('queues-container');
                 container.innerHTML = ''; // Clear existing buttons
 
                 for (const queue of queuesResult.entities) {
+                    console.log('Fetching metrics for queue:', queue.name);
                     // Get queue metrics
                     const metrics = await routingApi.getRoutingQueueMetrics(queue.id);
+                    console.log('Queue metrics received:', metrics);
                     
                     const button = document.createElement('div');
                     button.className = 'queue-button';
@@ -206,11 +226,21 @@
                     button.onclick = () => initiateConsultTransfer(queue.id);
                     container.appendChild(button);
                 }
+
+                // Add timestamp to show last refresh
+                const timestamp = document.createElement('div');
+                timestamp.style.textAlign = 'center';
+                timestamp.style.marginTop = '20px';
+                timestamp.style.color = '#666';
+                timestamp.innerHTML = `Last updated: ${new Date().toLocaleTimeString()}`;
+                container.appendChild(timestamp);
+
             } catch (e) {
                 console.error('Failed to refresh queues:', e);
                 document.getElementById('queues-container').innerHTML = `
                     <div style="color: red; text-align: center; padding: 20px;">
                         Error loading queues: ${e.message}<br>
+                        <pre style="text-align: left; margin-top: 10px; font-size: 12px;">${JSON.stringify(e, null, 2)}</pre>
                         Please check your permissions and try again.
                     </div>
                 `;

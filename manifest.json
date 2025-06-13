@@ -33,7 +33,9 @@
     },
     "permissions": [
         "conversation",
-        "routing:queue:view"
+        "routing:queue:view",
+        "routing:queue:all",
+        "routing:queue:metrics"
     ],
     "groups": []
 } 
