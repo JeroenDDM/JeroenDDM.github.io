@@ -1,12 +1,29 @@
 {
     "name": "Queue Transfer Demo",
     "version": "1.0.0",
-    "integrationType": "widget",
+    "integrationType": "premium-app-example",
+    "type": "widget",
     "url": "https://jeroenddm.github.io/",
     "sandbox": "allow-forms,allow-modals,allow-popups,allow-presentation,allow-same-origin,allow-scripts,allow-downloads",
-    "displayType": "standalone",
+    "displayType": "widget",
+    "featureCategory": "interactionWidget",
+    "groupName": "Interaction Widgets",
     "lifecycle": {
         "ephemeral": true
+    },
+    "width": 400,
+    "height": 500,
+    "settings": {
+        "showForTypes": [
+            "call",
+            "callback",
+            "chat",
+            "email",
+            "message",
+            "socialExpression",
+            "videoComm",
+            "workflow"
+        ]
     },
     "icon": {
         "vector": "",
