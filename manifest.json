@@ -8,7 +8,11 @@
     "featureCategory": "interactionWidget",
     "groupName": "Interaction Widgets",
     "lifecycle": {
-        "ephemeral": true
+        "ephemeral": true,
+        "hooks": {
+            "focus": true,
+            "blur": true
+        }
     },
     "width": 400,
     "height": 500,

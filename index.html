@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Queue Transfer Demo</title>
-    <script src="https://sdk-cdn.mypurecloud.com/app-sdk/v2.6.3/purecloud-app-sdk.js"></script>
+    <script src="https://sdk-cdn.mypurecloud.com/client-apps/2.6.7/purecloud-client-app-sdk.js"></script>
     <script src="https://sdk-cdn.mypurecloud.com/javascript/latest/purecloud-platform-client-v2.min.js"></script>
     <style>
         body {
@@ -124,71 +124,89 @@
         const conversationsApi = new platformClient.ConversationsApi();
 
         let currentInteractionId = null;
+        let clientApp = null;
 
         // Wait for the SDK to be ready
-        window.addEventListener('load', function() {
-            // Initialize the Client App SDK
-            const clientApp = new window.purecloud.apps.ClientApp();
+        window.addEventListener('load', async function() {
+            console.log('Page loaded, initializing app...');
+            
+            try {
+                // Initialize the Client App SDK
+                clientApp = new window.purecloud.apps.ClientApp({
+                    pcEnvironment: pcEnvironment
+                });
 
-            // Initialize the application
-            async function initializeApp() {
+                // Bootstrap the app
+                await clientApp.alerting.showToastPopup('Initializing', 'Queue Transfer Demo is starting');
+                console.log('SDK initialized');
+
+                // Start the application
+                await initializeApp();
+            } catch (error) {
+                console.error('Failed to initialize SDK:', error);
+                document.getElementById('queues-container').innerHTML = `
+                    <div style="color: red; text-align: center; padding: 20px;">
+                        Error initializing SDK: ${error.message}<br>
+                        Please make sure you're running this app from within Genesys Cloud.
+                    </div>
+                `;
+            }
+        });
+
+        // Initialize the application
+        async function initializeApp() {
+            try {
+                console.log('Starting app initialization...');
+                
+                // Configure the Platform API Client
+                client.setEnvironment(pcEnvironment);
+                console.log('Environment set to:', pcEnvironment);
+                
+                // Get authentication token
                 try {
-                    // Configure the Platform API Client
-                    client.setEnvironment(pcEnvironment);
-                    console.log('Environment set to:', pcEnvironment);
+                    console.log('Getting auth token...');
+                    const authData = await clientApp.getAuthToken();
+                    console.log('Auth data received');
                     
-                    // Get authentication token
-                    try {
-                        const token = await new Promise((resolve, reject) => {
-                            clientApp.getAuthToken((err, token) => {
-                                if (err) {
-                                    console.error('Auth error:', err);
-                                    reject(err);
-                                } else {
-                                    console.log('Auth token received');
-                                    resolve(token);
-                                }
-                            });
-                        });
-                        
-                        if (!token) {
-                            throw new Error('Not authenticated. Please ensure you are logged into Genesys Cloud.');
-                        }
-                        
-                        client.setAccessToken(token);
-                        console.log('Access token set successfully');
-                    } catch (authError) {
-                        throw new Error(`Authentication failed: ${authError.message}`);
+                    if (!authData) {
+                        throw new Error('Not authenticated. Please ensure you are logged into Genesys Cloud.');
                     }
+                    
+                    client.setAccessToken(authData);
+                    console.log('Access token set successfully');
+                } catch (authError) {
+                    console.error('Authentication error:', authError);
+                    throw new Error(`Authentication failed: ${authError.message}`);
+                }
 
-                    // Start monitoring queues
-                    await refreshQueues();
-                    // Refresh every 5 seconds
-                    setInterval(refreshQueues, 5000);
-
-                    // Get the current interaction ID from the URL parameters
-                    const interactionId = urlParams.get('conversationId') || urlParams.get('interactionId');
-                    if (interactionId) {
-                        currentInteractionId = interactionId;
+                // Get the current interaction
+                try {
+                    const interaction = await clientApp.alerting.showToastPopup('Loading', 'Getting current interaction...');
+                    if (interaction && interaction.id) {
+                        currentInteractionId = interaction.id;
                         console.log('Current interaction ID:', currentInteractionId);
                     }
-
-                } catch (e) {
-                    console.error('Failed to initialize app:', e);
-                    document.getElementById('queues-container').innerHTML = `
-                        <div style="color: red; text-align: center; padding: 20px;">
-                            Error: ${e.message}<br>
-                            Please make sure you're running this app from within Genesys Cloud.
-                        </div>
-                    `;
+                } catch (error) {
+                    console.warn('No active interaction found:', error);
                 }
-            }
 
-            // Start the application
-            initializeApp().catch(error => {
-                console.error('Failed to start app:', error);
-            });
-        });
+                // Start monitoring queues
+                await refreshQueues();
+                // Refresh every 5 seconds
+                setInterval(refreshQueues, 5000);
+
+                await clientApp.alerting.showToastPopup('Ready', 'Queue Transfer Demo is ready');
+
+            } catch (e) {
+                console.error('Failed to initialize app:', e);
+                document.getElementById('queues-container').innerHTML = `
+                    <div style="color: red; text-align: center; padding: 20px;">
+                        Error: ${e.message}<br>
+                        Please make sure you're running this app from within Genesys Cloud.
+                    </div>
+                `;
+            }
+        }
 
         // Fetch and display queues
         async function refreshQueues() {
@@ -250,11 +268,12 @@
         // Initiate a consult transfer to the selected queue
         async function initiateConsultTransfer(queueId) {
             if (!currentInteractionId) {
-                alert('No active interaction found');
+                await clientApp.alerting.showToastPopup('Error', 'No active interaction found');
                 return;
             }
 
             try {
+                await clientApp.alerting.showToastPopup('Processing', 'Initiating transfer...');
                 await conversationsApi.postConversationsMessageConsulttransfer(
                     currentInteractionId,
                     {
@@ -263,9 +282,10 @@
                         queueId: queueId
                     }
                 );
+                await clientApp.alerting.showToastPopup('Success', 'Transfer initiated successfully');
             } catch (e) {
                 console.error('Failed to initiate transfer:', e);
-                alert('Failed to initiate transfer. Please try again.');
+                await clientApp.alerting.showToastPopup('Error', 'Failed to initiate transfer. Please try again.');
             }
         }
     </script>
