@@ -165,14 +165,15 @@
                 // Get authentication token
                 try {
                     console.log('Getting auth token...');
-                    const authData = await clientApp.getAuthToken();
-                    console.log('Auth data received');
+                    const authData = await clientApp.alerting.showToastPopup('Authenticating', 'Getting authentication token...');
                     
-                    if (!authData) {
+                    // Get the auth token from the URL parameters
+                    const token = urlParams.get('gcToken');
+                    if (!token) {
                         throw new Error('Not authenticated. Please ensure you are logged into Genesys Cloud.');
                     }
                     
-                    client.setAccessToken(authData);
+                    client.setAccessToken(token);
                     console.log('Access token set successfully');
                 } catch (authError) {
                     console.error('Authentication error:', authError);
