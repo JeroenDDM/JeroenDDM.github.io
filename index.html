@@ -134,14 +134,14 @@
         async function initializeApp() {
             try {
                 // Get the environment from the Client App SDK
-                const environment = await clientApp.environment();
+                const environment = clientApp.pcEnvironment;
                 
                 // Configure the Platform API Client
-                client.setEnvironment(environment.environment);
+                client.setEnvironment(environment);
                 
                 // Get authentication from the Client App SDK
-                const auth = await clientApp.auth();
-                client.setAccessToken(auth.accessToken);
+                const auth = await clientApp.getAuthToken();
+                client.setAccessToken(auth);
 
                 // Start monitoring queues
                 await refreshQueues();
@@ -149,7 +149,7 @@
                 setInterval(refreshQueues, 5000);
 
                 // Get the current interaction ID
-                const interaction = await clientApp.interaction();
+                const interaction = clientApp.currentInteraction;
                 if (interaction) {
                     currentInteractionId = interaction.id;
                 }
