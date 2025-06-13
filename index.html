@@ -125,59 +125,75 @@
 
         let currentInteractionId = null;
 
-        // Initialize the Client App SDK
-        const clientApp = new window.purecloud.apps.ClientApp({
-            pcEnvironment: pcEnvironment
-        });
+        // Wait for the SDK to be ready
+        window.addEventListener('load', function() {
+            if (typeof window.GenesysCloudClientApi !== 'undefined') {
+                // Initialize the Client App SDK
+                const clientApp = new window.GenesysCloudClientApi({
+                    pcEnvironment: pcEnvironment
+                });
 
-        // Initialize the application
-        async function initializeApp() {
-            try {
-                // Configure the Platform API Client
-                client.setEnvironment(pcEnvironment);
-                
-                // Get authentication token
-                try {
-                    const token = await new Promise((resolve, reject) => {
-                        clientApp.getAuthToken((err, token) => {
-                            if (err) {
-                                reject(err);
-                            } else {
-                                resolve(token);
+                // Initialize the application
+                async function initializeApp() {
+                    try {
+                        // Configure the Platform API Client
+                        client.setEnvironment(pcEnvironment);
+                        
+                        // Get authentication token
+                        try {
+                            const token = await new Promise((resolve, reject) => {
+                                clientApp.getAuthToken((err, token) => {
+                                    if (err) {
+                                        reject(err);
+                                    } else {
+                                        resolve(token);
+                                    }
+                                });
+                            });
+                            
+                            if (!token) {
+                                throw new Error('Not authenticated. Please ensure you are logged into Genesys Cloud.');
                             }
-                        });
-                    });
-                    
-                    if (!token) {
-                        throw new Error('Not authenticated. Please ensure you are logged into Genesys Cloud.');
+                            
+                            client.setAccessToken(token);
+                        } catch (authError) {
+                            throw new Error(`Authentication failed: ${authError.message}`);
+                        }
+
+                        // Start monitoring queues
+                        await refreshQueues();
+                        // Refresh every 5 seconds
+                        setInterval(refreshQueues, 5000);
+
+                        // Get the current interaction ID from the URL parameters
+                        const interactionId = urlParams.get('conversationId') || urlParams.get('interactionId');
+                        if (interactionId) {
+                            currentInteractionId = interactionId;
+                        }
+
+                    } catch (e) {
+                        console.error('Failed to initialize app:', e);
+                        document.getElementById('queues-container').innerHTML = `
+                            <div style="color: red; text-align: center; padding: 20px;">
+                                Error: ${e.message}<br>
+                                Please make sure you're running this app from within Genesys Cloud.
+                            </div>
+                        `;
                     }
-                    
-                    client.setAccessToken(token);
-                } catch (authError) {
-                    throw new Error(`Authentication failed: ${authError.message}`);
                 }
 
-                // Start monitoring queues
-                await refreshQueues();
-                // Refresh every 5 seconds
-                setInterval(refreshQueues, 5000);
-
-                // Get the current interaction ID from the URL parameters
-                const interactionId = urlParams.get('conversationId') || urlParams.get('interactionId');
-                if (interactionId) {
-                    currentInteractionId = interactionId;
-                }
-
-            } catch (e) {
-                console.error('Failed to initialize app:', e);
+                // Start the application
+                initializeApp();
+            } else {
+                console.error('Genesys Cloud Client API not loaded');
                 document.getElementById('queues-container').innerHTML = `
                     <div style="color: red; text-align: center; padding: 20px;">
-                        Error: ${e.message}<br>
+                        Error: Genesys Cloud Client API not loaded.<br>
                         Please make sure you're running this app from within Genesys Cloud.
                     </div>
                 `;
             }
-        }
+        });
 
         // Fetch and display queues
         async function refreshQueues() {
@@ -232,9 +248,6 @@
                 alert('Failed to initiate transfer. Please try again.');
             }
         }
-
-        // Start the application
-        initializeApp();
     </script>
 </body>
 </html> 
