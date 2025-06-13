@@ -1,0 +1,28 @@
+{
+  "name": "jeroenddm.github.io",
+  "version": "1.0.0",
+  "description": "A Genesys Cloud embedded client application that enables agents to transfer conversations to queues. This app provides a user-friendly interface to view available queues and their current metrics, allowing agents to initiate consult transfers with a single click.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JeroenDDM/JeroenDDM.github.io.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/JeroenDDM/JeroenDDM.github.io/issues"
+  },
+  "homepage": "https://github.com/JeroenDDM/JeroenDDM.github.io#readme",
+  "dependencies": {
+    "purecloud-client-app-sdk": "^2.6.7",
+    "purecloud-platform-client-v2": "^223.0.0"
+  }
+}
