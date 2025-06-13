@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Queue Transfer Demo</title>
+    <script src="https://sdk-cdn.mypurecloud.com/client-apps/2.6.3/purecloud-client-app-sdk.js"></script>
+    <script src="https://sdk-cdn.mypurecloud.com/javascript/latest/purecloud-platform-client-v2.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .queue-button {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .queue-button:hover {
+            background-color: #f0f0f0;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .queue-name {
+            font-weight: bold;
+            color: #2196F3;
+        }
+        .queue-count {
+            background-color: #2196F3;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+        #queues-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #environment-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px auto;
+            max-width: 600px;
+            display: none;
+        }
+        .environment-selector {
+            text-align: center;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="environment-selector">
+        <label for="environment">Environment: </label>
+        <select id="environment" onchange="updateEnvironment()">
+            <option value="mypurecloud.com">US East (Virginia)</option>
+            <option value="mypurecloud.ie">EMEA (Ireland)</option>
+            <option value="mypurecloud.com.au">Asia Pacific (Sydney)</option>
+            <option value="mypurecloud.jp">Asia Pacific (Tokyo)</option>
+            <option value="mypurecloud.de">European Union (Frankfurt)</option>
+            <option value="usw2.pure.cloud">US West (Oregon)</option>
+            <option value="cac1.pure.cloud">Canada (Central)</option>
+            <option value="sae1.pure.cloud">South America (São Paulo)</option>
+            <option value="aps1.pure.cloud">Asia Pacific (Seoul)</option>
+            <option value="apne2.pure.cloud">Asia Pacific (Mumbai)</option>
+        </select>
+    </div>
+    <div id="environment-warning">
+        Running in standalone mode. For full functionality, launch this app from within Genesys Cloud.
+    </div>
+    <div class="header">
+        <h1>Queue Transfer</h1>
+        <p>Click on a queue to initiate a consult transfer</p>
+    </div>
+    <div id="queues-container">
+        <!-- Queue buttons will be dynamically inserted here -->
+    </div>
+
+    <script>
+        // Get environment from URL or use default
+        const urlParams = new URLSearchParams(window.location.search);
+        let pcEnvironment = urlParams.get('pcEnvironment');
+        
+        // Show environment warning if running standalone
+        if (!pcEnvironment) {
+            document.getElementById('environment-warning').style.display = 'block';
+            // Use the selected environment as default
+            pcEnvironment = document.getElementById('environment').value;
+        } else {
+            // Hide environment selector if running in Genesys Cloud
+            document.querySelector('.environment-selector').style.display = 'none';
+        }
+
+        // Function to update environment
+        function updateEnvironment() {
+            pcEnvironment = document.getElementById('environment').value;
+            initializeApp();
+        }
+
+        // Initialize the Client App SDK
+        const clientApp = new window.purecloud.apps.ClientApp({
+            pcEnvironment: pcEnvironment
+        });
+
+        // Initialize the Platform API Client
+        const platformClient = window.require('platformClient');
+        const client = platformClient.ApiClient.instance;
+        const routingApi = new platformClient.RoutingApi();
+        const conversationsApi = new platformClient.ConversationsApi();
+
+        let currentInteractionId = null;
+
+        // Initialize the application
+        async function initializeApp() {
+            try {
+                // Get the environment from the Client App SDK
+                const environment = await clientApp.environment();
+                
+                // Configure the Platform API Client
+                client.setEnvironment(environment.environment);
+                
+                // Get authentication from the Client App SDK
+                const auth = await clientApp.auth();
+                client.setAccessToken(auth.accessToken);
+
+                // Start monitoring queues
+                await refreshQueues();
+                // Refresh every 5 seconds
+                setInterval(refreshQueues, 5000);
+
+                // Get the current interaction ID
+                const interaction = await clientApp.interaction();
+                if (interaction) {
+                    currentInteractionId = interaction.id;
+                }
+            } catch (e) {
+                console.error('Failed to initialize app:', e);
+                document.getElementById('queues-container').innerHTML = `
+                    <div style="color: red; text-align: center; padding: 20px;">
+                        Error: ${e.message}<br>
+                        Please make sure you're running this app from within Genesys Cloud.
+                    </div>
+                `;
+            }
+        }
+
+        // Fetch and display queues
+        async function refreshQueues() {
+            try {
+                const queuesResult = await routingApi.getRoutingQueues({ pageSize: 100 });
+                const container = document.getElementById('queues-container');
+                container.innerHTML = ''; // Clear existing buttons
+
+                for (const queue of queuesResult.entities) {
+                    // Get queue metrics
+                    const metrics = await routingApi.getRoutingQueueMetrics(queue.id);
+                    
+                    const button = document.createElement('div');
+                    button.className = 'queue-button';
+                    button.innerHTML = `
+                        <span class="queue-name">${queue.name}</span>
+                        <span class="queue-count">${metrics.metrics.find(m => m.metric === 'oInteracting')?.value || 0} in queue</span>
+                    `;
+                    
+                    button.onclick = () => initiateConsultTransfer(queue.id);
+                    container.appendChild(button);
+                }
+            } catch (e) {
+                console.error('Failed to refresh queues:', e);
+            }
+        }
+
+        // Initiate a consult transfer to the selected queue
+        async function initiateConsultTransfer(queueId) {
+            if (!currentInteractionId) {
+                alert('No active interaction found');
+                return;
+            }
+
+            try {
+                await conversationsApi.postConversationsMessageConsulttransfer(
+                    currentInteractionId,
+                    {
+                        speakTo: 'DESTINATION',
+                        transferType: 'QUEUE',
+                        queueId: queueId
+                    }
+                );
+            } catch (e) {
+                console.error('Failed to initiate transfer:', e);
+                alert('Failed to initiate transfer. Please try again.');
+            }
+        }
+
+        // Start the application
+        initializeApp();
+    </script>
+</body>
+</html> 
