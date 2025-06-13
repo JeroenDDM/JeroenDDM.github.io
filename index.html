@@ -133,26 +133,28 @@
         // Initialize the application
         async function initializeApp() {
             try {
-                // Get the environment from the Client App SDK
-                const environment = clientApp.pcEnvironment;
+                // Bootstrap the Client App SDK
+                await clientApp.alerting.showToastPopup('Initializing...', 'Queue Transfer Demo is starting up');
                 
                 // Configure the Platform API Client
-                client.setEnvironment(environment);
+                client.setEnvironment(pcEnvironment);
                 
                 // Get authentication from the Client App SDK
-                const auth = await clientApp.getAuthToken();
-                client.setAccessToken(auth);
+                const token = await clientApp.getAuthToken();
+                client.setAccessToken(token);
 
                 // Start monitoring queues
                 await refreshQueues();
                 // Refresh every 5 seconds
                 setInterval(refreshQueues, 5000);
 
-                // Get the current interaction ID
-                const interaction = clientApp.currentInteraction;
-                if (interaction) {
-                    currentInteractionId = interaction.id;
+                // Get the current interaction ID from the URL parameters
+                const interactionId = urlParams.get('conversationId') || urlParams.get('interactionId');
+                if (interactionId) {
+                    currentInteractionId = interactionId;
                 }
+
+                await clientApp.alerting.showToastPopup('Ready', 'Queue Transfer Demo is ready');
             } catch (e) {
                 console.error('Failed to initialize app:', e);
                 document.getElementById('queues-container').innerHTML = `
