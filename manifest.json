@@ -6,13 +6,7 @@
     "sandbox": "allow-forms,allow-modals,allow-popups,allow-presentation,allow-same-origin,allow-scripts,allow-downloads",
     "displayType": "standalone",
     "lifecycle": {
-        "ephemeral": true,
-        "hooks": {
-            "bootstrap": true,
-            "focus": true,
-            "blur": true,
-            "stop": true
-        }
+        "ephemeral": true
     },
     "icon": {
         "vector": "",
@@ -23,9 +17,7 @@
     },
     "permissions": [
         "conversation",
-        "routing:queue:view",
-        "alerting",
-        "analytics"
+        "routing:queue:view"
     ],
     "groups": []
 } 

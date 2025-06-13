@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Queue Transfer Demo</title>
-    <script src="https://sdk-cdn.mypurecloud.com/client-apps/2.6.3/purecloud-client-app-sdk.js"></script>
+    <script src="https://sdk-cdn.mypurecloud.com/client-apps/2.6.3/purecloud-client-app-sdk-de1c2e13.min.js"></script>
     <script src="https://sdk-cdn.mypurecloud.com/javascript/latest/purecloud-platform-client-v2.min.js"></script>
     <style>
         body {
@@ -73,8 +73,8 @@
     <div class="environment-selector">
         <label for="environment">Environment: </label>
         <select id="environment" onchange="updateEnvironment()">
-            <option value="mypurecloud.com">US East (Virginia)</option>
             <option value="mypurecloud.ie">EMEA (Ireland)</option>
+            <option value="mypurecloud.com">US East (Virginia)</option>
             <option value="mypurecloud.com.au">Asia Pacific (Sydney)</option>
             <option value="mypurecloud.jp">Asia Pacific (Tokyo)</option>
             <option value="mypurecloud.de">European Union (Frankfurt)</option>
@@ -117,12 +117,6 @@
             initializeApp();
         }
 
-        // Initialize the Client App SDK
-        const clientApp = new window.purecloud.apps.ClientApp({
-            pcEnvironment: pcEnvironment,
-            customInteractionAttributes: ['interactionId', 'conversationId']
-        });
-
         // Initialize the Platform API Client
         const platformClient = window.require('platformClient');
         const client = platformClient.ApiClient.instance;
@@ -131,18 +125,9 @@
 
         let currentInteractionId = null;
 
-        // Bootstrap the app
-        clientApp.lifecycle.bootstrap().then(() => {
-            console.log('App bootstrapped');
-            initializeApp();
-        }).catch(e => {
-            console.error('Failed to bootstrap:', e);
-            document.getElementById('queues-container').innerHTML = `
-                <div style="color: red; text-align: center; padding: 20px;">
-                    Error bootstrapping app: ${e.message}<br>
-                    Please make sure you're running this app from within Genesys Cloud.
-                </div>
-            `;
+        // Initialize the Client App SDK
+        const clientApp = new window.purecloud.apps.ClientApp({
+            pcEnvironment: pcEnvironment
         });
 
         // Initialize the application
@@ -151,12 +136,26 @@
                 // Configure the Platform API Client
                 client.setEnvironment(pcEnvironment);
                 
-                // Get authentication from the Client App SDK
-                const token = await clientApp.authToken;
-                if (!token) {
-                    throw new Error('Not authenticated. Please ensure you are logged into Genesys Cloud.');
+                // Get authentication token
+                try {
+                    const token = await new Promise((resolve, reject) => {
+                        clientApp.getAuthToken((err, token) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                resolve(token);
+                            }
+                        });
+                    });
+                    
+                    if (!token) {
+                        throw new Error('Not authenticated. Please ensure you are logged into Genesys Cloud.');
+                    }
+                    
+                    client.setAccessToken(token);
+                } catch (authError) {
+                    throw new Error(`Authentication failed: ${authError.message}`);
                 }
-                client.setAccessToken(token);
 
                 // Start monitoring queues
                 await refreshQueues();
@@ -169,7 +168,6 @@
                     currentInteractionId = interactionId;
                 }
 
-                await clientApp.alerting.showToastPopup('Ready', 'Queue Transfer Demo is ready');
             } catch (e) {
                 console.error('Failed to initialize app:', e);
                 document.getElementById('queues-container').innerHTML = `
@@ -204,6 +202,12 @@
                 }
             } catch (e) {
                 console.error('Failed to refresh queues:', e);
+                document.getElementById('queues-container').innerHTML = `
+                    <div style="color: red; text-align: center; padding: 20px;">
+                        Error loading queues: ${e.message}<br>
+                        Please check your permissions and try again.
+                    </div>
+                `;
             }
         }
 
@@ -228,6 +232,9 @@
                 alert('Failed to initiate transfer. Please try again.');
             }
         }
+
+        // Start the application
+        initializeApp();
     </script>
 </body>
 </html> 
