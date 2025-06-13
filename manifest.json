@@ -1,0 +1,28 @@
+{
+    "name": "Queue Transfer Demo",
+    "version": "1.0.0",
+    "integrationType": "embedded-client-app",
+    "url": "https://jeroenddm.github.io/",
+    "sandbox": "allow-forms,allow-modals,allow-scripts,allow-same-origin",
+    "displayType": "standalone",
+    "lifecycle": {
+        "ephemeral": false,
+        "hooks": {
+            "bootstrap": true,
+            "focus": true,
+            "blur": true,
+            "stop": true
+        }
+    },
+    "icon": {
+        "vector": "",
+        "24x24": "",
+        "36x36": "",
+        "48x48": "",
+        "72x72": ""
+    },
+    "permissions": [
+        "conversation",
+        "routing:queue:view"
+    ]
+} 
