@@ -53,9 +53,8 @@ class QueueMonitor {
             this.routingApi = new this.platformClient.RoutingApi();
             this.analyticsApi = new this.platformClient.AnalyticsApi();
 
-            // For interaction widgets, authentication is handled by the Genesys Cloud environment
-            // Skip explicit authentication and proceed to load data
-            this.updateConnectionStatus('connected', 'Connected to Genesys Cloud');
+            // Set up authentication using Client App SDK
+            await this.authenticateWithGenesys();
             
             // Load initial data
             await this.loadQueues();
@@ -73,32 +72,39 @@ class QueueMonitor {
         try {
             this.updateConnectionStatus('connecting', 'Authenticating...');
             
-            // For interaction widgets, authentication is handled automatically
-            // The Client App SDK provides the authenticated context
-            // We just need to wait for the lifecycle to be ready
-            
-            // Wait for the app to be ready
-            await new Promise((resolve, reject) => {
+            // Use the Client App SDK lifecycle to get authenticated session
+            // The app should bootstrap and provide access to the authenticated context
+            const bootstrapData = await new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
-                    reject(new Error('Timeout waiting for app to be ready'));
-                }, 10000); // 10 second timeout
+                    reject(new Error('Timeout waiting for app bootstrap'));
+                }, 15000); // 15 second timeout
                 
-                // Check if we're already ready
+                // Try to get the bootstrap data from the lifecycle API
                 if (this.clientApp && this.clientApp.lifecycle) {
-                    clearTimeout(timeout);
-                    resolve();
-                    return;
+                    this.clientApp.lifecycle.bootstrapped()
+                        .then((data) => {
+                            clearTimeout(timeout);
+                            resolve(data);
+                        })
+                        .catch((error) => {
+                            clearTimeout(timeout);
+                            reject(error);
+                        });
+                } else {
+                    // Fallback - assume we're authenticated in the Genesys Cloud context
+                    setTimeout(() => {
+                        clearTimeout(timeout);
+                        resolve({ authenticated: true });
+                    }, 2000);
                 }
-                
-                // For fallback, just resolve after a short delay
-                setTimeout(() => {
-                    clearTimeout(timeout);
-                    resolve();
-                }, 1000);
             });
             
+            console.log('Bootstrap data:', bootstrapData);
+            
+            // The Platform Client should automatically use the authenticated session
+            // when running in the Genesys Cloud environment
             this.updateConnectionStatus('connected', 'Connected');
-            console.log('Authentication successful - running in Genesys Cloud context');
+            console.log('Authentication successful - running in authenticated Genesys Cloud context');
             
         } catch (error) {
             console.error('Authentication failed:', error);
