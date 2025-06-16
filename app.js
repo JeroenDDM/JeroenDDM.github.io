@@ -89,15 +89,21 @@ class QueueMonitor {
             
             // Check if we're in a Genesys Cloud environment by looking for query parameters
             const urlParams = new URLSearchParams(window.location.search);
-            const hasGenesysParams = urlParams.has('gcHostOrigin') || 
-                                     urlParams.has('gcTargetEnv') || 
-                                     urlParams.has('pcEnvironment') ||
-                                     urlParams.has('iid') || // interaction ID
-                                     urlParams.has('host') || // host parameter
-                                     urlParams.has('locale') || // locale parameter
-                                     window.location.hostname.includes('mypurecloud') || // running on Genesys Cloud domain
-                                     window.location.hostname.includes('apps.') || // apps subdomain
-                                     (window.parent !== window); // running in iframe
+            const hasGenesysQueryParams = urlParams.has('gcHostOrigin') || 
+                                         urlParams.has('gcTargetEnv') || 
+                                         urlParams.has('pcEnvironment') ||
+                                         urlParams.has('iid') || // interaction ID
+                                         urlParams.has('host') || // host parameter
+                                         urlParams.has('locale'); // locale parameter
+            
+            const isGenesysDomain = window.location.hostname.includes('mypurecloud') || // running on Genesys Cloud domain
+                                   window.location.hostname.includes('apps.'); // apps subdomain
+            
+            const isInIframe = window.parent !== window;
+            
+            // Only consider it a Genesys environment if we have actual Genesys parameters OR we're on a Genesys domain
+            // Being in an iframe alone is not sufficient
+            const hasGenesysParams = hasGenesysQueryParams || isGenesysDomain;
             
             // Log detailed information about the current URL and parameters
             console.log('[QueueMonitor] Current URL:', window.location.href);
@@ -110,7 +116,9 @@ class QueueMonitor {
                 host: urlParams.get('host'),
                 locale: urlParams.get('locale'),
                 hostname: window.location.hostname,
-                isInIframe: window.parent !== window,
+                isInIframe: isInIframe,
+                hasGenesysQueryParams: hasGenesysQueryParams,
+                isGenesysDomain: isGenesysDomain,
                 hasGenesysParams: hasGenesysParams
             });
             
