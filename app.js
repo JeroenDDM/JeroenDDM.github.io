@@ -476,22 +476,19 @@ class QueueMonitor {
 
             // Create analytics query for real-time queue statistics (voice media type only)
             const query = {
-                interval: `${new Date().toISOString().split('T')[0]}T00:00:00.000Z/${new Date().toISOString()}`,
-                granularity: 'PT30M',
-                timeZone: 'UTC',
-                groupBy: ['queueId'],
+                metrics: ['oWaiting', 'oInteracting', 'oAlerting', 'oActiveUsers', 'oOnQueueUsers'],
                 filter: {
                     type: 'and',
-                    predicates: [
+                    clauses: [
                         {
                             type: 'or',
                             predicates: queueIds.map(queueId => ({
-                                type: 'dimension',
                                 dimension: 'queueId',
-                                operator: 'matches',
                                 value: queueId
                             }))
-                        },
+                        }
+                    ],
+                    predicates: [
                         {
                             type: 'dimension',
                             dimension: 'mediaType',
@@ -499,8 +496,7 @@ class QueueMonitor {
                             value: 'voice'
                         }
                     ]
-                },
-                metrics: ['oWaiting', 'oInteracting', 'oAlerting', 'oActiveUsers', 'oOnQueueUsers']
+                }
             };
 
             const response = await this.analyticsApi.postAnalyticsQueuesObservationsQuery(query);
