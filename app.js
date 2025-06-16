@@ -11,8 +11,8 @@ class QueueMonitor {
         
         // OAuth Configuration - Replace with your actual OAuth app details
         this.oauthConfig = {
-            clientId: 'YOUR_OAUTH_CLIENT_ID', // Replace with your OAuth client ID
-            redirectUri: window.location.origin + window.location.pathname, // Current page
+            clientId: '110d379d-9f0d-452f-8706-e8975a058f7f', // Replace with your OAuth client ID
+            redirectUri: 'https://jeroenddm.github.io/', // Current page
             environment: 'mypurecloud.ie', // Your Genesys Cloud environment
             scopes: ['routing', 'analytics'] // Required permissions
         };
@@ -274,7 +274,7 @@ class QueueMonitor {
                 console.log('[QueueMonitor] Running in standalone mode - attempting OAuth authentication');
                 
                 // Check if we have a valid OAuth client ID configured
-                if (this.oauthConfig.clientId === 'YOUR_OAUTH_CLIENT_ID') {
+                if (this.oauthConfig.clientId === 'YOUR_OAUTH_CLIENT_ID' || !this.oauthConfig.clientId) {
                     this.updateConnectionStatus('warning', 'OAuth Configuration Required');
                     this.showError('To use this widget outside Genesys Cloud, you need to configure OAuth. Please set your OAuth Client ID in the code and ensure your app is registered in Genesys Cloud.');
                     return { success: false, reason: 'oauth_not_configured' };
