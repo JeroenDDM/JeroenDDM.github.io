@@ -16,7 +16,7 @@ class QueueMonitor {
     async initializeApp() {
         try {
             // Initialize the Client App SDK
-            this.clientApp = new window.ClientApp({
+            this.clientApp = new window.purecloud.apps.ClientApp({
                 pcEnvironment: window.location.hostname
             });
 
