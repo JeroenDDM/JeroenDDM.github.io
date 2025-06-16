@@ -41,7 +41,7 @@ class QueueMonitor {
             this.clientApp = new window.purecloud.apps.ClientApp(clientAppConfig);
 
             // Initialize the Platform Client
-            this.platformClient = window.platformClient;
+            this.platformClient = require('platformClient');
             
             // Set the environment for the Platform Client
             const environment = this.clientApp.gcEnvironment || this.clientApp.pcEnvironment;
