@@ -474,7 +474,7 @@ class QueueMonitor {
         try {
             if (!queueIds || queueIds.length === 0) return {};
 
-            // Create analytics query for real-time queue statistics
+            // Create analytics query for real-time queue statistics (voice media type only)
             const query = {
                 interval: `${new Date().toISOString().split('T')[0]}T00:00:00.000Z/${new Date().toISOString()}`,
                 granularity: 'PT30M',
@@ -491,6 +491,12 @@ class QueueMonitor {
                                 operator: 'matches',
                                 value: queueId
                             }))
+                        },
+                        {
+                            type: 'dimension',
+                            dimension: 'mediaType',
+                            operator: 'matches',
+                            value: 'voice'
                         }
                     ]
                 },
@@ -506,16 +512,59 @@ class QueueMonitor {
             const stats = {};
             if (response && response.results) {
                 console.log('[QueueMonitor] Processing', response.results.length, 'results');
+                
+                // Initialize stats for all queues
+                queueIds.forEach(queueId => {
+                    stats[queueId] = {
+                        waiting: 0,
+                        interacting: 0,
+                        alerting: 0,
+                        activeUsers: 0,
+                        onQueueUsers: 0
+                    };
+                });
+                
                 response.results.forEach((result, index) => {
                     console.log(`[QueueMonitor] Result ${index}:`, result);
                     if (result.group && result.group.queueId && result.data) {
                         const queueId = result.group.queueId;
-                        const latestData = result.data[result.data.length - 1] || {};
-                        console.log(`[QueueMonitor] Queue ${queueId} latest data:`, latestData);
-                        stats[queueId] = latestData.stats || {};
-                        console.log(`[QueueMonitor] Queue ${queueId} extracted stats:`, stats[queueId]);
+                        const mediaType = result.group.mediaType;
+                        
+                        console.log(`[QueueMonitor] Processing queue ${queueId}, mediaType: ${mediaType || 'none'}`);
+                        
+                        // Process each metric in the data array
+                        result.data.forEach(dataItem => {
+                            const metric = dataItem.metric;
+                            const count = dataItem.stats ? dataItem.stats.count : 0;
+                            
+                            console.log(`[QueueMonitor] Queue ${queueId}, metric: ${metric}, count: ${count}, qualifier: ${dataItem.qualifier || 'none'}`);
+                            
+                            // Map metrics to our stats object (voice media type only)
+                            switch (metric) {
+                                case 'oWaiting':
+                                    stats[queueId].waiting = count;
+                                    break;
+                                case 'oInteracting':
+                                    stats[queueId].interacting = count;
+                                    break;
+                                case 'oAlerting':
+                                    stats[queueId].alerting = count;
+                                    break;
+                                case 'oActiveUsers':
+                                    stats[queueId].activeUsers = count;
+                                    break;
+                                case 'oOnQueueUsers':
+                                    // Sum up all on-queue users regardless of qualifier
+                                    stats[queueId].onQueueUsers += count;
+                                    break;
+                            }
+                        });
+                        
+                        console.log(`[QueueMonitor] Queue ${queueId} current stats:`, stats[queueId]);
                     }
                 });
+                
+                console.log('[QueueMonitor] Final aggregated stats:', stats);
             } else {
                 console.log('[QueueMonitor] No results in analytics response');
             }
