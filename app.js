@@ -302,6 +302,26 @@ class QueueMonitor {
             
             const client = this.platformClient.ApiClient.instance;
             
+            // Ensure environment is set before handling token
+            const environment = this.oauthConfig.environment;
+            let regionHost;
+            if (environment === 'mypurecloud.ie') {
+                regionHost = this.platformClient.PureCloudRegionHosts.eu_west_1;
+            } else if (environment === 'mypurecloud.com') {
+                regionHost = this.platformClient.PureCloudRegionHosts.us_east_1;
+            } else if (environment === 'mypurecloud.com.au') {
+                regionHost = this.platformClient.PureCloudRegionHosts.ap_southeast_2;
+            } else if (environment === 'mypurecloud.jp') {
+                regionHost = this.platformClient.PureCloudRegionHosts.ap_northeast_1;
+            } else if (environment === 'mypurecloud.de') {
+                regionHost = this.platformClient.PureCloudRegionHosts.eu_central_1;
+            } else {
+                regionHost = environment;
+            }
+            
+            client.setEnvironment(regionHost);
+            console.log('[QueueMonitor] OAuth: Set environment to:', environment, 'Region Host:', regionHost);
+            
             // Check if we already have a token from URL hash (OAuth redirect)
             const hash = window.location.hash;
             if (hash && hash.includes('access_token')) {
@@ -309,8 +329,12 @@ class QueueMonitor {
                 const accessToken = hashParams.get('access_token');
                 
                 if (accessToken) {
-                    console.log('[QueueMonitor] Found OAuth access token in URL hash');
+                    console.log('[QueueMonitor] Found OAuth access token in URL hash:', accessToken.substring(0, 20) + '...');
                     client.setAccessToken(accessToken);
+                    
+                    // Verify the token was set
+                    const verifyToken = client.authentications?.PureCloud?.accessToken;
+                    console.log('[QueueMonitor] Token verification after setting:', verifyToken ? (verifyToken.substring(0, 20) + '...') : 'NOT SET');
                     
                     // Clean up the URL hash
                     window.history.replaceState(null, null, window.location.pathname + window.location.search);
