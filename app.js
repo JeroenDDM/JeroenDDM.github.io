@@ -128,25 +128,109 @@ class QueueMonitor {
                     // Check if we already have a token from a previous authentication
                     const existingToken = client.authentications?.PureCloud?.accessToken;
                     if (existingToken) {
-                        console.log('[QueueMonitor] Using existing access token');
+                        console.log('[QueueMonitor] Using existing access token:', existingToken.substring(0, 20) + '...');
                         this.updateConnectionStatus('connected', 'Connected');
                         return;
                     }
                     
-                    // For interaction widgets running within Genesys Cloud, we can try implicit grant
-                    // This requires a client ID - for interaction widgets, this is typically handled
-                    // by the Genesys Cloud environment automatically
+                    // Try multiple methods to find an access token
+                    let foundToken = null;
                     
-                    // Check if there's an access token in the URL hash (from OAuth redirect)
+                    // Method 1: Check URL hash (from OAuth redirect)
                     if (window.location.hash) {
                         const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                        const accessToken = hashParams.get('access_token');
-                        if (accessToken) {
-                            console.log('[QueueMonitor] Found access token in URL hash, setting on Platform Client');
-                            client.setAccessToken(accessToken);
+                        foundToken = hashParams.get('access_token');
+                        if (foundToken) {
+                            console.log('[QueueMonitor] Found access token in URL hash');
+                        }
+                    }
+                    
+                    // Method 2: Check session/local storage
+                    if (!foundToken) {
+                        const storageKeys = [
+                            'purecloud_access_token',
+                            'access_token',
+                            'gc_access_token',
+                            'authToken',
+                            'bearer_token'
+                        ];
+                        
+                        for (const key of storageKeys) {
+                            foundToken = sessionStorage.getItem(key) || localStorage.getItem(key);
+                            if (foundToken) {
+                                console.log('[QueueMonitor] Found access token in storage with key:', key);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Method 3: Try to get token from parent window (if in iframe)
+                    if (!foundToken && window.parent !== window) {
+                        try {
+                            for (const key of ['purecloud_access_token', 'access_token', 'gc_access_token']) {
+                                foundToken = window.parent.sessionStorage?.getItem(key) || 
+                                           window.parent.localStorage?.getItem(key);
+                                if (foundToken) {
+                                    console.log('[QueueMonitor] Found access token in parent window with key:', key);
+                                    break;
+                                }
+                            }
+                        } catch (e) {
+                            console.log('[QueueMonitor] Cannot access parent window storage (cross-origin)');
+                        }
+                    }
+                    
+                    // Method 4: Check if token is available via Client App SDK
+                    if (!foundToken && window.purecloud?.apps?.ClientApp) {
+                        try {
+                            console.log('[QueueMonitor] Attempting to get token via Client App SDK');
+                            const clientApp = new window.purecloud.apps.ClientApp();
+                            
+                            // Try to get the current user's authentication info
+                            // This might provide access to the token or authenticated context
+                            const authInfo = await new Promise((resolve, reject) => {
+                                const timeout = setTimeout(() => reject(new Error('Timeout')), 3000);
+                                
+                                // Try different methods that might be available
+                                if (typeof clientApp.getAuthToken === 'function') {
+                                    clientApp.getAuthToken().then(resolve).catch(reject);
+                                } else if (typeof clientApp.users?.me === 'function') {
+                                    clientApp.users.me().then(resolve).catch(reject);
+                                } else {
+                                    // If no specific methods, just resolve with null
+                                    clearTimeout(timeout);
+                                    resolve(null);
+                                }
+                            });
+                            
+                            if (authInfo && authInfo.token) {
+                                foundToken = authInfo.token;
+                                console.log('[QueueMonitor] Got token from Client App SDK');
+                            }
+                        } catch (e) {
+                            console.log('[QueueMonitor] Could not get token via Client App SDK:', e.message);
+                        }
+                    }
+                    
+                    if (foundToken) {
+                        console.log('[QueueMonitor] Setting access token on Platform Client:', foundToken.substring(0, 20) + '...');
+                        client.setAccessToken(foundToken);
+                        this.updateConnectionStatus('connected', 'Connected');
+                        return;
+                    }
+                    
+                    // Method 5: Test if we're already authenticated by making a simple API call
+                    console.log('[QueueMonitor] No token found, testing if already authenticated...');
+                    try {
+                        // Try a simple API call to see if we're authenticated
+                        const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                        if (testResponse) {
+                            console.log('[QueueMonitor] API call succeeded - already authenticated in Genesys Cloud context');
                             this.updateConnectionStatus('connected', 'Connected');
                             return;
                         }
+                    } catch (testError) {
+                        console.log('[QueueMonitor] Test API call failed:', testError.message);
                     }
                     
                     // For interaction widgets, try to use the loginImplicitGrant method
@@ -188,6 +272,12 @@ class QueueMonitor {
             this.isLoading = true;
             this.showLoading(true);
             this.hideError();
+            
+            // Debug: Check authentication state before making API calls
+            const client = this.platformClient.ApiClient.instance;
+            const currentToken = client.authentications?.PureCloud?.accessToken;
+            console.log('[QueueMonitor] Making API call with token:', currentToken ? (currentToken.substring(0, 20) + '...') : 'NO TOKEN');
+            console.log('[QueueMonitor] API Client base path:', client.basePath);
             
             // Fetch all queues
             const queuesResponse = await this.routingApi.getRoutingQueues({
