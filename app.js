@@ -442,15 +442,18 @@ class QueueMonitor {
             // Combine queue info with statistics
             this.queues = queuesResponse.entities.map(queue => {
                 const stats = queueStats[queue.id] || {};
+                console.log(`[QueueMonitor] Queue "${queue.name}" (${queue.id}) raw stats:`, stats);
+                const processedStats = {
+                    waiting: stats.oWaiting || 0,
+                    interacting: stats.oInteracting || 0,
+                    alerting: stats.oAlerting || 0,
+                    activeUsers: stats.oActiveUsers || 0,
+                    onQueueUsers: stats.oOnQueueUsers || 0
+                };
+                console.log(`[QueueMonitor] Queue "${queue.name}" processed stats:`, processedStats);
                 return {
                     ...queue,
-                    stats: {
-                        waiting: stats.oWaiting || 0,
-                        interacting: stats.oInteracting || 0,
-                        alerting: stats.oAlerting || 0,
-                        activeUsers: stats.oActiveUsers || 0,
-                        onQueueUsers: stats.oOnQueueUsers || 0
-                    }
+                    stats: processedStats
                 };
             });
 
@@ -496,16 +499,25 @@ class QueueMonitor {
 
             const response = await this.analyticsApi.postAnalyticsQueuesObservationsQuery(query);
             
+            // Debug: Log the full response structure
+            console.log('[QueueMonitor] Analytics API response:', response);
+            
             // Process the response to create a lookup by queue ID
             const stats = {};
             if (response && response.results) {
-                response.results.forEach(result => {
+                console.log('[QueueMonitor] Processing', response.results.length, 'results');
+                response.results.forEach((result, index) => {
+                    console.log(`[QueueMonitor] Result ${index}:`, result);
                     if (result.group && result.group.queueId && result.data) {
                         const queueId = result.group.queueId;
                         const latestData = result.data[result.data.length - 1] || {};
+                        console.log(`[QueueMonitor] Queue ${queueId} latest data:`, latestData);
                         stats[queueId] = latestData.stats || {};
+                        console.log(`[QueueMonitor] Queue ${queueId} extracted stats:`, stats[queueId]);
                     }
                 });
+            } else {
+                console.log('[QueueMonitor] No results in analytics response');
             }
 
             return stats;
