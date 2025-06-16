@@ -330,11 +330,34 @@ class QueueMonitor {
                 
                 if (accessToken) {
                     console.log('[QueueMonitor] Found OAuth access token in URL hash:', accessToken.substring(0, 20) + '...');
-                    client.setAccessToken(accessToken);
+                    
+                    // Try multiple methods to set the token
+                    try {
+                        // Method 1: Direct setAccessToken
+                        client.setAccessToken(accessToken);
+                        console.log('[QueueMonitor] Method 1 - setAccessToken called');
+                        
+                        // Method 2: Set authentication directly
+                        if (client.authentications && client.authentications.PureCloud) {
+                            client.authentications.PureCloud.accessToken = accessToken;
+                            console.log('[QueueMonitor] Method 2 - Direct authentication property set');
+                        }
+                        
+                        // Method 3: Set default authentication
+                        client.defaultHeaders = client.defaultHeaders || {};
+                        client.defaultHeaders['Authorization'] = `Bearer ${accessToken}`;
+                        console.log('[QueueMonitor] Method 3 - Authorization header set');
+                        
+                    } catch (tokenError) {
+                        console.error('[QueueMonitor] Error setting token:', tokenError);
+                    }
                     
                     // Verify the token was set
                     const verifyToken = client.authentications?.PureCloud?.accessToken;
-                    console.log('[QueueMonitor] Token verification after setting:', verifyToken ? (verifyToken.substring(0, 20) + '...') : 'NOT SET');
+                    const verifyHeader = client.defaultHeaders?.['Authorization'];
+                    console.log('[QueueMonitor] Token verification after setting:');
+                    console.log('  - PureCloud auth:', verifyToken ? (verifyToken.substring(0, 20) + '...') : 'NOT SET');
+                    console.log('  - Auth header:', verifyHeader ? (verifyHeader.substring(0, 27) + '...') : 'NOT SET');
                     
                     // Clean up the URL hash
                     window.history.replaceState(null, null, window.location.pathname + window.location.search);
@@ -391,11 +414,14 @@ class QueueMonitor {
             // Debug: Check authentication state before making API calls
             const client = this.platformClient.ApiClient.instance;
             const currentToken = client.authentications?.PureCloud?.accessToken;
-            console.log('[QueueMonitor] Making API call with token:', currentToken ? (currentToken.substring(0, 20) + '...') : 'NO TOKEN');
-            console.log('[QueueMonitor] API Client base path:', client.basePath || 'NOT SET');
+            const authHeader = client.defaultHeaders?.['Authorization'];
+            console.log('[QueueMonitor] Making API call with:');
+            console.log('  - Token:', currentToken ? (currentToken.substring(0, 20) + '...') : 'NO TOKEN');
+            console.log('  - Auth Header:', authHeader ? (authHeader.substring(0, 27) + '...') : 'NO HEADER');
+            console.log('  - Base Path:', client.basePath || 'NOT SET');
             
-            // If no token, don't make API calls
-            if (!currentToken) {
+            // If no token and no auth header, don't make API calls
+            if (!currentToken && !authHeader) {
                 throw new Error('No authentication token available - cannot make API calls');
             }
             
