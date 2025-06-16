@@ -482,7 +482,7 @@ class QueueMonitor {
                 groupBy: ['queueId'],
                 filter: {
                     type: 'and',
-                    clauses: [
+                    predicates: [
                         {
                             type: 'or',
                             predicates: queueIds.map(queueId => ({
