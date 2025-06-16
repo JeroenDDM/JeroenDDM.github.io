@@ -34,7 +34,7 @@ class QueueMonitor {
             } else {
                 // Fallback to default environment for testing
                 clientAppConfig = {
-                    pcEnvironment: 'mypurecloud.com'
+                    pcEnvironment: 'mypurecloud.ie'
                 };
             }
             
@@ -47,21 +47,23 @@ class QueueMonitor {
             const environment = this.clientApp.gcEnvironment || this.clientApp.pcEnvironment;
             if (environment) {
                 // Map environment to the correct region
-                let region = environment;
+                let regionHost;
                 if (environment === 'mypurecloud.ie') {
-                    region = this.platformClient.PureCloudRegionHosts.eu_west_1;
+                    regionHost = this.platformClient.PureCloudRegionHosts.eu_west_1;
                 } else if (environment === 'mypurecloud.com') {
-                    region = this.platformClient.PureCloudRegionHosts.us_east_1;
+                    regionHost = this.platformClient.PureCloudRegionHosts.us_east_1;
                 } else if (environment === 'mypurecloud.com.au') {
-                    region = this.platformClient.PureCloudRegionHosts.ap_southeast_2;
+                    regionHost = this.platformClient.PureCloudRegionHosts.ap_southeast_2;
                 } else if (environment === 'mypurecloud.jp') {
-                    region = this.platformClient.PureCloudRegionHosts.ap_northeast_1;
+                    regionHost = this.platformClient.PureCloudRegionHosts.ap_northeast_1;
                 } else if (environment === 'mypurecloud.de') {
-                    region = this.platformClient.PureCloudRegionHosts.eu_central_1;
+                    regionHost = this.platformClient.PureCloudRegionHosts.eu_central_1;
+                } else {
+                    regionHost = environment; // fallback to environment string
                 }
                 
-                this.platformClient.ApiClient.instance.setEnvironment(region);
-                console.log('[QueueMonitor] Set Platform Client environment to:', environment, 'Region:', region);
+                this.platformClient.ApiClient.instance.setEnvironment(regionHost);
+                console.log('[QueueMonitor] Set Platform Client environment to:', environment, 'Region Host:', regionHost);
             }
             
             // Get APIs
@@ -69,13 +71,16 @@ class QueueMonitor {
             this.analyticsApi = new this.platformClient.AnalyticsApi();
 
             // Set up authentication using Client App SDK
-            await this.authenticateWithGenesys();
+            const authResult = await this.authenticateWithGenesys();
             
-            // Load initial data
-            await this.loadQueues();
-            
-            // Set up auto-refresh if enabled
-            this.setupAutoRefresh();
+            // Only load data if authentication was successful
+            if (authResult.success) {
+                // Load initial data
+                await this.loadQueues();
+                
+                // Set up auto-refresh if enabled
+                this.setupAutoRefresh();
+            }
             
         } catch (error) {
             console.error('[QueueMonitor] Failed to initialize app:', error);
@@ -138,7 +143,7 @@ class QueueMonitor {
                     if (existingToken) {
                         console.log('[QueueMonitor] Using existing access token:', existingToken.substring(0, 20) + '...');
                         this.updateConnectionStatus('connected', 'Connected');
-                        return;
+                        return { success: true };
                     }
                     
                     // Try multiple methods to find an access token
@@ -224,7 +229,7 @@ class QueueMonitor {
                         console.log('[QueueMonitor] Setting access token on Platform Client:', foundToken.substring(0, 20) + '...');
                         client.setAccessToken(foundToken);
                         this.updateConnectionStatus('connected', 'Connected');
-                        return;
+                        return { success: true };
                     }
                     
                     // Method 5: Test if we're already authenticated by making a simple API call
@@ -235,7 +240,7 @@ class QueueMonitor {
                         if (testResponse) {
                             console.log('[QueueMonitor] API call succeeded - already authenticated in Genesys Cloud context');
                             this.updateConnectionStatus('connected', 'Connected');
-                            return;
+                            return { success: true };
                         }
                     } catch (testError) {
                         console.log('[QueueMonitor] Test API call failed:', testError.message);
@@ -263,16 +268,17 @@ class QueueMonitor {
                 // For now, show a helpful message to the user
                 this.updateConnectionStatus('warning', 'Standalone Mode - No Authentication');
                 this.showError('This widget is running in standalone mode. To use it with live data, it needs to be deployed as a Genesys Cloud interaction widget with proper OAuth configuration.');
-                return; // Don't proceed with API calls without authentication
+                return { success: false, reason: 'standalone_mode' }; // Don't proceed with API calls without authentication
             }
             
             this.updateConnectionStatus('connected', 'Connected');
             console.log('[QueueMonitor] Authentication successful');
+            return { success: true };
             
         } catch (error) {
             console.error('[QueueMonitor] Authentication failed:', error);
             this.updateConnectionStatus('error', 'Authentication failed');
-            throw new Error('Authentication failed: ' + error.message);
+            return { success: false, reason: 'authentication_error', error: error.message };
         }
     }
 
