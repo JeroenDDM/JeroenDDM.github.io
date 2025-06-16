@@ -447,8 +447,8 @@ class QueueMonitor {
                     stats: {
                         waiting: stats.oWaiting || 0,
                         interacting: stats.oInteracting || 0,
-                        abandoned: stats.oAbandonedToday || 0,
-                        answered: stats.oAnsweredToday || 0,
+                        abandoned: stats.oAbandoned || 0,
+                        answered: stats.oAnswered || 0,
                         avgWaitTime: stats.oWaitingAvgTime || 0,
                         longestWait: stats.oWaitingMaxTime || 0
                     }
@@ -492,7 +492,7 @@ class QueueMonitor {
                         }
                     ]
                 },
-                metrics: ['oWaiting', 'oInteracting', 'oAbandonedToday', 'oAnsweredToday', 'oWaitingAvgTime', 'oWaitingMaxTime']
+                metrics: ['oWaiting', 'oInteracting', 'oAbandoned', 'oAnswered', 'oWaitingAvgTime', 'oWaitingMaxTime']
             };
 
             const response = await this.analyticsApi.postAnalyticsQueuesObservationsQuery(query);
@@ -553,11 +553,11 @@ class QueueMonitor {
                         </div>
                         <div class="stat-item">
                             <span class="stat-number">${queue.stats.answered || 0}</span>
-                            <span class="stat-label">Answered Today</span>
+                            <span class="stat-label">Answered</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-number">${queue.stats.abandoned || 0}</span>
-                            <span class="stat-label">Abandoned Today</span>
+                            <span class="stat-label">Abandoned</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-number">${this.formatTime(queue.stats.avgWaitTime)}</span>
