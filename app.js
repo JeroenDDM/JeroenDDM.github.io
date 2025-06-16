@@ -16,13 +16,38 @@ class QueueMonitor {
     async initializeApp() {
         try {
             // Initialize the Client App SDK
-            this.clientApp = new window.purecloud.apps.ClientApp({
-                pcEnvironment: window.location.hostname
-            });
+            // Try to get environment from query parameters first (for interaction widgets)
+            const urlParams = new URLSearchParams(window.location.search);
+            let clientAppConfig = {};
+            
+            if (urlParams.has('gcHostOrigin') && urlParams.has('gcTargetEnv')) {
+                // Running as interaction widget with Genesys Cloud query params
+                clientAppConfig = {
+                    gcHostOriginQueryParam: 'gcHostOrigin',
+                    gcTargetEnvQueryParam: 'gcTargetEnv'
+                };
+            } else if (urlParams.has('pcEnvironment')) {
+                // Alternative parameter format
+                clientAppConfig = {
+                    pcEnvironmentQueryParam: 'pcEnvironment'
+                };
+            } else {
+                // Fallback to default environment for testing
+                clientAppConfig = {
+                    pcEnvironment: 'mypurecloud.com'
+                };
+            }
+            
+            this.clientApp = new window.purecloud.apps.ClientApp(clientAppConfig);
 
             // Initialize the Platform Client
             this.platformClient = window.platformClient;
-            this.platformClient.ApiClient.instance.setEnvironment(this.clientApp.pcEnvironment);
+            
+            // Set the environment for the Platform Client
+            const environment = this.clientApp.gcEnvironment || this.clientApp.pcEnvironment;
+            if (environment) {
+                this.platformClient.ApiClient.instance.setEnvironment(environment);
+            }
             
             // Get APIs
             this.routingApi = new this.platformClient.RoutingApi();
