@@ -1,0 +1,25 @@
+import { Environment } from 'genesys-cloud-service-discovery-web';
+export interface PcEnv {
+    pcEnvTld: string;
+    pcAppOrigin: string;
+}
+export declare const DEFAULT_PC_ENV: PcEnv;
+/**
+ * Attempts to locate a PC environment corresponding to the provided search params
+ *
+ * @param pcEnvTld A string representing the Genesys Cloud environment top-level domain to search for
+ * @param lenient When true, trims leading/trailing whitespace, ignores leading '.', and ignores trailing '/'.
+ * @param envTlds A string array of all available Genesys Cloud environment top-level domains
+ * @param hostAppDevOrigin The origin to target when the host app is running on `localhost`
+ *
+ * @returns A Genesys Cloud environment object if found; null otherwise.
+ */
+export declare const lookupPcEnv: (pcEnvTld: string, lenient?: boolean, envTlds?: string[], hostAppDevOrigin?: string) => PcEnv | null;
+/**
+ * Attempts to locate a GC environment corresponding to the provided origin/targetEnv combination
+ * @param url A string representing the Genesys Cloud environment url
+ * @param targetEnv A string representing the Genesys Cloud environment target
+ * @param envs A Environment array of all available Genesys Cloud environments
+ * @returns A Genesys Cloud environment object if found; null otherwise.
+ */
+export declare const lookupGcEnv: (url: string, targetEnv: string, envs?: Environment[]) => PcEnv | null;

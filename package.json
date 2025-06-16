@@ -1,0 +1,27 @@
+{
+  "name": "jeroenddm.github.io",
+  "version": "1.0.0",
+  "description": "genesys interaction widget",
+  "keywords": [
+    "Genesys"
+  ],
+  "homepage": "https://github.com/JeroenDDM/JeroenDDM.github.io#readme",
+  "bugs": {
+    "url": "https://github.com/JeroenDDM/JeroenDDM.github.io/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JeroenDDM/JeroenDDM.github.io.git"
+  },
+  "license": "ISC",
+  "author": "Jeroen",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "purecloud-client-app-sdk": "^2.6.7",
+    "purecloud-platform-client-v2": "^223.0.0"
+  }
+}

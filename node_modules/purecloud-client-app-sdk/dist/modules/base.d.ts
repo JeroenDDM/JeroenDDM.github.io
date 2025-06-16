@@ -1,0 +1,152 @@
+export interface SDKMessagePayload {
+    action: string;
+    hook?: string;
+    protocol: string;
+    protocolAgentName: string;
+    protocolAgentVersion: string;
+}
+export declare type MessageListener = (event: SDKMessagePayload) => void;
+export declare type MessagePayloadFilter = (payload: SDKMessagePayload) => boolean;
+declare type ListenerOptions = Partial<{
+    /**
+     * Set to true to only invoke this listener once; it will be removed after first invocation.
+     * false by default.  null/undefined will use default.
+     */
+    once: boolean;
+    /**
+     * Provide a function to further filter the invocation of the listener;
+     * The listener will be called if this method returns a truthy value. null by default.  undefined will also use default.
+     */
+    msgPayloadFilter: MessagePayloadFilter | null;
+}>;
+/**
+ * Base Class for Genesys Cloud Client App APIs
+ *
+ * @since 1.0.0
+ */
+declare class BaseApi {
+    private _targetPcOrigin;
+    private _protocolDetails;
+    private _msgListenerCfgs;
+    private _msgHandler;
+    /**
+     * Injection point for tests.  Should not be used by api users or extenders.
+     */
+    private _commsUtils;
+    /**
+     * Injection point for tests.  Should not be used by api users or extenders.
+     */
+    private _myWindow;
+    /**
+     * Injection point for tests.  Should not be used by api users or extenders.
+     */
+    private _myParent;
+    /**
+     * Instantiates the BaseApi
+     *
+     * @param cfg Optional configuration
+     *
+     * @since 1.0.0
+     */
+    constructor(cfg?: {
+        /** The origin (protocol, hostname, and port) of the target PC environment (e.g. https://apps.mypurecloud.com). Default is '*'. */
+        targetPcOrigin?: string | null;
+        /** The name of the message protocol under which the message will be sent. Default is purecloud-client-apps. */
+        protocol?: string | null;
+        /** The name of the agent from which the message will be sent. Default is purecloud-client-app-sdk (name of the package). */
+        protocolAgentName?: string | null;
+        /** The version of the agent from which the message will be sent. Default is the version of the package. */
+        protocolAgentVersion?: string | null;
+    });
+    /**
+     * Sends the message to Genesys Cloud augmenting with environmental details such as
+     * target env origin and version info.  Accessible by extenders.
+     *
+     * @param actionName
+     * @param msgPayload
+     *
+     * @since 1.0.0
+     */
+    protected sendMsgToPc(actionName: string, msgPayload?: object): void;
+    /**
+     * Constructs a payload tailored for the Genesys Cloud Client Apps SDK.  Can be
+     * overridden by extenders, but should not be invoked externally.
+     *
+     * @param actionName - The name of the client-app action to invoke
+     * @param msgPayload - Action-specific payload data
+     *
+     * @returns A postMessage payload for the Client Apps SDK
+     *
+     * @since 1.0.0
+     */
+    protected buildSdkMsgPayload(actionName: string, msgPayload?: object): SDKMessagePayload;
+    /**
+     * Adds the specified listener to messages sent from the host Genesys Cloud appliation
+     * on the specified eventType
+     *
+     * @param eventType - The name of the purecloudEventType in the message; case and leading/trailing space sensitive
+     * @param listener - The listener function to invoke when a message of the specified eventType
+     *   is received.  Message data will be passed
+     * @param options - Options for the invocation of the listener; null/undefined will use defaults
+     *
+     * @since 1.0.0
+     */
+    protected addMsgListener(eventType: string, listener: MessageListener, options?: ListenerOptions | null): void;
+    /**
+     * Removes the specified listener from messages sent from the host Genesys Cloud appliation
+     * on the specified eventType. eventType, listener (strict equality), and options must match.
+     *
+     * @param eventType - The name of the purecloudEventType previously registered; case and leading/trailing space sensitive
+     * @param listener - The exact listener function instance that was previously registered.
+     * @param options - Options registered with the listener;
+     *  null and undefined trigger defaults and will be considered equal.
+     *
+     * @throws Error if the eventType, listener, or options are invalid
+     *
+     * @since 1.0.0
+     */
+    protected removeMsgListener(eventType: string, listener: MessageListener, options?: ListenerOptions | null): void;
+    /**
+     * Returns the total number of registered listeners.
+     */
+    private _getListenerCount;
+    /**
+     * Initiate listening for messages from the host Genesys Cloud application
+     */
+    private _subscribeToMsgs;
+    /**
+     * Stop listening for messages from the host Genesys Cloud application
+     */
+    private _unsubscribeFromMsgs;
+    /**
+     * Message handler function that will filter message events and invoke the correct, registered
+     * listeners.
+     */
+    private _onMsg;
+    /**
+     * Validates and normalizes listener options. msgPayloadFilter will be normalized to null and once
+     * will be normalized to false if not specified or specified as an "empty" object (null/undefined).
+     *
+     * @param options The additional options config provided to [add|remove]MsgListener; null and undefined also allowed.
+     *
+     * @returns A normalized listener options object containing the msgPayloadFilter and once properties.
+     * msgPayloadFilter will be null unless a valid function is explicitly provided.  once will be false unless true
+     * is explictly provided.
+     *
+     * @throws Error if options is not null, undefined, or an object
+     * @throws Error if options.msgPayloadFilter is not null, undefined, or a function
+     * @throws Error if options.once is not null, undefined, or a boolean
+     */
+    private _buildNormalizedListenerOptions;
+    /**
+     * Determines if the specified listener configs are duplicates with respect to
+     * listener registration.  Assumes the configs will be normalized for easier comparison.
+     *
+     * @param listenerCfg1 The first config
+     * @param listenerCfg2 The second config
+     *
+     * @returns true if the listener, msgPayloadFilter, and once are equal; false otherwise
+     */
+    private _isDuplicateListenerCfg;
+}
+export default BaseApi;

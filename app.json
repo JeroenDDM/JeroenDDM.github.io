@@ -1,0 +1,55 @@
+{
+  "name": "Queue Monitor Widget",
+  "displayName": "Queue Monitor",
+  "description": "Real-time queue monitoring widget for Genesys Cloud agents",
+  "version": "1.0.0",
+  "vendor": "Custom",
+  "type": "widget",
+  "categories": ["analytics", "monitoring"],
+  "permissions": [
+    "routing",
+    "analytics"
+  ],
+  "components": [
+    {
+      "name": "Queue Monitor Widget",
+      "type": "interactionWidget",
+      "displayName": "Queue Monitor",
+      "url": "index.html",
+      "sandbox": "allow-same-origin allow-scripts allow-popups allow-forms",
+      "interactionTypes": ["voice", "chat", "email", "callback", "message"],
+      "icon": {
+        "vector": "queue-monitor-icon.svg",
+        "48x48": "queue-monitor-48.png"
+      }
+    }
+  ],
+  "monochromicIcon": {
+    "vector": "queue-monitor-mono.svg"
+  },
+  "integrationType": "custom-client-app",
+  "help": {
+    "url": "https://github.com/JeroenDDM/JeroenDDM.github.io#readme"
+  },
+  "manifest": {
+    "name": "Queue Monitor Widget",
+    "short_name": "QueueMonitor",
+    "description": "Monitor queue statistics in real-time",
+    "start_url": "index.html",
+    "display": "standalone",
+    "theme_color": "#667eea",
+    "background_color": "#ffffff",
+    "icons": [
+      {
+        "src": "queue-monitor-48.png",
+        "sizes": "48x48",
+        "type": "image/png"
+      },
+      {
+        "src": "queue-monitor-192.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      }
+    ]
+  }
+} 
