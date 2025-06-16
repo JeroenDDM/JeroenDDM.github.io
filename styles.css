@@ -131,6 +131,10 @@ body {
     background: #dc3545;
 }
 
+.status-dot.warning {
+    background: #ffc107;
+}
+
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.5; }

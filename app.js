@@ -260,7 +260,10 @@ class QueueMonitor {
             } else {
                 console.log('[QueueMonitor] Running in standalone mode - would need OAuth client ID for implicit grant');
                 // In standalone mode, we would need to implement full OAuth flow
-                // For now, we'll just proceed without authentication for testing
+                // For now, show a helpful message to the user
+                this.updateConnectionStatus('warning', 'Standalone Mode - No Authentication');
+                this.showError('This widget is running in standalone mode. To use it with live data, it needs to be deployed as a Genesys Cloud interaction widget with proper OAuth configuration.');
+                return; // Don't proceed with API calls without authentication
             }
             
             this.updateConnectionStatus('connected', 'Connected');
@@ -285,7 +288,12 @@ class QueueMonitor {
             const client = this.platformClient.ApiClient.instance;
             const currentToken = client.authentications?.PureCloud?.accessToken;
             console.log('[QueueMonitor] Making API call with token:', currentToken ? (currentToken.substring(0, 20) + '...') : 'NO TOKEN');
-            console.log('[QueueMonitor] API Client base path:', client.basePath);
+            console.log('[QueueMonitor] API Client base path:', client.basePath || 'NOT SET');
+            
+            // If no token, don't make API calls
+            if (!currentToken) {
+                throw new Error('No authentication token available - cannot make API calls');
+            }
             
             // Fetch all queues
             const queuesResponse = await this.routingApi.getRoutingQueues({
