@@ -61,7 +61,7 @@ class QueueMonitor {
                 }
                 
                 this.platformClient.ApiClient.instance.setEnvironment(region);
-                console.log('Set Platform Client environment to:', environment, 'Region:', region);
+                console.log('[QueueMonitor] Set Platform Client environment to:', environment, 'Region:', region);
             }
             
             // Get APIs
@@ -78,7 +78,7 @@ class QueueMonitor {
             this.setupAutoRefresh();
             
         } catch (error) {
-            console.error('Failed to initialize app:', error);
+            console.error('[QueueMonitor] Failed to initialize app:', error);
             this.showError('Failed to initialize application: ' + error.message);
         }
     }
@@ -89,10 +89,33 @@ class QueueMonitor {
             
             // Check if we're in a Genesys Cloud environment by looking for query parameters
             const urlParams = new URLSearchParams(window.location.search);
-            const hasGenesysParams = urlParams.has('gcHostOrigin') || urlParams.has('gcTargetEnv') || urlParams.has('pcEnvironment');
+            const hasGenesysParams = urlParams.has('gcHostOrigin') || 
+                                     urlParams.has('gcTargetEnv') || 
+                                     urlParams.has('pcEnvironment') ||
+                                     urlParams.has('iid') || // interaction ID
+                                     urlParams.has('host') || // host parameter
+                                     urlParams.has('locale') || // locale parameter
+                                     window.location.hostname.includes('mypurecloud') || // running on Genesys Cloud domain
+                                     window.location.hostname.includes('apps.') || // apps subdomain
+                                     (window.parent !== window); // running in iframe
+            
+            // Log detailed information about the current URL and parameters
+            console.log('[QueueMonitor] Current URL:', window.location.href);
+            console.log('[QueueMonitor] Query parameters:', window.location.search);
+            console.log('[QueueMonitor] URL parameters found:', {
+                gcHostOrigin: urlParams.get('gcHostOrigin'),
+                gcTargetEnv: urlParams.get('gcTargetEnv'),
+                pcEnvironment: urlParams.get('pcEnvironment'),
+                iid: urlParams.get('iid'),
+                host: urlParams.get('host'),
+                locale: urlParams.get('locale'),
+                hostname: window.location.hostname,
+                isInIframe: window.parent !== window,
+                hasGenesysParams: hasGenesysParams
+            });
             
             if (hasGenesysParams) {
-                console.log('Running in Genesys Cloud environment - using implicit grant authentication');
+                console.log('[QueueMonitor] Running in Genesys Cloud environment - using implicit grant authentication');
                 
                 // For interaction widgets, we can use implicit grant authentication
                 // The widget should already have access to the authenticated session
@@ -105,7 +128,7 @@ class QueueMonitor {
                     // Check if we already have a token from a previous authentication
                     const existingToken = client.authentications?.PureCloud?.accessToken;
                     if (existingToken) {
-                        console.log('Using existing access token');
+                        console.log('[QueueMonitor] Using existing access token');
                         this.updateConnectionStatus('connected', 'Connected');
                         return;
                     }
@@ -119,7 +142,7 @@ class QueueMonitor {
                         const hashParams = new URLSearchParams(window.location.hash.substring(1));
                         const accessToken = hashParams.get('access_token');
                         if (accessToken) {
-                            console.log('Found access token in URL hash, setting on Platform Client');
+                            console.log('[QueueMonitor] Found access token in URL hash, setting on Platform Client');
                             client.setAccessToken(accessToken);
                             this.updateConnectionStatus('connected', 'Connected');
                             return;
@@ -128,31 +151,31 @@ class QueueMonitor {
                     
                     // For interaction widgets, try to use the loginImplicitGrant method
                     // This might work if we're in the right context
-                    console.log('Attempting implicit grant authentication...');
+                    console.log('[QueueMonitor] Attempting implicit grant authentication...');
                     
                     // Note: In a real interaction widget, you would have a client ID
                     // For now, we'll assume the widget is running in an authenticated context
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     
-                    console.log('Authentication completed - assuming authenticated Genesys Cloud context');
+                    console.log('[QueueMonitor] Authentication completed - assuming authenticated Genesys Cloud context');
                     
                 } catch (authError) {
-                    console.error('Implicit grant authentication failed:', authError);
+                    console.error('[QueueMonitor] Implicit grant authentication failed:', authError);
                     // Don't throw the error - continue and see if API calls work anyway
-                    console.log('Continuing without explicit authentication - may work in Genesys Cloud context');
+                    console.log('[QueueMonitor] Continuing without explicit authentication - may work in Genesys Cloud context');
                 }
                 
             } else {
-                console.log('Running in standalone mode - would need OAuth client ID for implicit grant');
+                console.log('[QueueMonitor] Running in standalone mode - would need OAuth client ID for implicit grant');
                 // In standalone mode, we would need to implement full OAuth flow
                 // For now, we'll just proceed without authentication for testing
             }
             
             this.updateConnectionStatus('connected', 'Connected');
-            console.log('Authentication successful');
+            console.log('[QueueMonitor] Authentication successful');
             
         } catch (error) {
-            console.error('Authentication failed:', error);
+            console.error('[QueueMonitor] Authentication failed:', error);
             this.updateConnectionStatus('error', 'Authentication failed');
             throw new Error('Authentication failed: ' + error.message);
         }
@@ -201,7 +224,7 @@ class QueueMonitor {
             this.updateLastRefreshTime();
             
         } catch (error) {
-            console.error('Failed to load queues:', error);
+            console.error('[QueueMonitor] Failed to load queues:', error);
             this.showError('Failed to load queue data: ' + error.message);
         } finally {
             this.isLoading = false;
@@ -253,7 +276,7 @@ class QueueMonitor {
             return stats;
             
         } catch (error) {
-            console.error('Failed to get queue statistics:', error);
+            console.error('[QueueMonitor] Failed to get queue statistics:', error);
             // Return empty stats if analytics query fails
             return {};
         }
@@ -415,7 +438,7 @@ class QueueMonitor {
 
     handleQueueClick(queueId) {
         // This can be extended to show queue details or perform actions
-        console.log('Queue clicked:', queueId);
+                    console.log('[QueueMonitor] Queue clicked:', queueId);
         
         // You can implement additional functionality here, such as:
         // - Opening queue details in a modal
