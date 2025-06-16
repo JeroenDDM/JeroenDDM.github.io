@@ -448,7 +448,6 @@ class QueueMonitor {
                         waiting: stats.oWaiting || 0,
                         interacting: stats.oInteracting || 0,
                         alerting: stats.oAlerting || 0,
-                        longestWaiting: stats.oLongestWaiting || 0,
                         activeUsers: stats.oActiveUsers || 0,
                         onQueueUsers: stats.oOnQueueUsers || 0
                     }
@@ -492,7 +491,7 @@ class QueueMonitor {
                         }
                     ]
                 },
-                metrics: ['oWaiting', 'oInteracting', 'oAlerting', 'oLongestWaiting', 'oActiveUsers', 'oOnQueueUsers']
+                metrics: ['oWaiting', 'oInteracting', 'oAlerting', 'oActiveUsers', 'oOnQueueUsers']
             };
 
             const response = await this.analyticsApi.postAnalyticsQueuesObservationsQuery(query);
@@ -554,10 +553,6 @@ class QueueMonitor {
                         <div class="stat-item">
                             <span class="stat-number">${queue.stats.alerting || 0}</span>
                             <span class="stat-label">Alerting</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">${this.formatTime(queue.stats.longestWaiting)}</span>
-                            <span class="stat-label">Longest Wait</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-number">${queue.stats.activeUsers || 0}</span>
