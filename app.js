@@ -46,7 +46,22 @@ class QueueMonitor {
             // Set the environment for the Platform Client
             const environment = this.clientApp.gcEnvironment || this.clientApp.pcEnvironment;
             if (environment) {
-                this.platformClient.ApiClient.instance.setEnvironment(environment);
+                // Map environment to the correct region
+                let region = environment;
+                if (environment === 'mypurecloud.ie') {
+                    region = this.platformClient.PureCloudRegionHosts.eu_west_1;
+                } else if (environment === 'mypurecloud.com') {
+                    region = this.platformClient.PureCloudRegionHosts.us_east_1;
+                } else if (environment === 'mypurecloud.com.au') {
+                    region = this.platformClient.PureCloudRegionHosts.ap_southeast_2;
+                } else if (environment === 'mypurecloud.jp') {
+                    region = this.platformClient.PureCloudRegionHosts.ap_northeast_1;
+                } else if (environment === 'mypurecloud.de') {
+                    region = this.platformClient.PureCloudRegionHosts.eu_central_1;
+                }
+                
+                this.platformClient.ApiClient.instance.setEnvironment(region);
+                console.log('Set Platform Client environment to:', environment, 'Region:', region);
             }
             
             // Get APIs
@@ -81,7 +96,43 @@ class QueueMonitor {
             const hasGenesysParams = urlParams.has('gcHostOrigin') || urlParams.has('gcTargetEnv') || urlParams.has('pcEnvironment');
             
             if (hasGenesysParams) {
-                console.log('Running in Genesys Cloud environment - authentication handled automatically');
+                console.log('Running in Genesys Cloud environment - attempting to get access token');
+                
+                // Try to get the access token from the parent window or session storage
+                let accessToken = null;
+                
+                // Method 1: Try to get from session storage
+                try {
+                    accessToken = sessionStorage.getItem('purecloud_access_token') || 
+                                 sessionStorage.getItem('access_token') ||
+                                 localStorage.getItem('purecloud_access_token') ||
+                                 localStorage.getItem('access_token');
+                } catch (e) {
+                    console.log('Could not access storage for token');
+                }
+                
+                // Method 2: Try to get from URL hash (if redirected from OAuth)
+                if (!accessToken && window.location.hash) {
+                    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                    accessToken = hashParams.get('access_token');
+                }
+                
+                // Method 3: Try to communicate with parent window
+                if (!accessToken && window.parent !== window) {
+                    try {
+                        // This might work if we're in an iframe and can access parent
+                        accessToken = window.parent.sessionStorage?.getItem('purecloud_access_token');
+                    } catch (e) {
+                        console.log('Could not access parent window storage');
+                    }
+                }
+                
+                if (accessToken) {
+                    console.log('Found access token, setting on Platform Client');
+                    this.platformClient.ApiClient.instance.setAccessToken(accessToken);
+                } else {
+                    console.log('No access token found - relying on Genesys Cloud environment');
+                }
             } else {
                 console.log('Running in standalone mode - using fallback authentication');
             }
