@@ -447,10 +447,10 @@ class QueueMonitor {
                     stats: {
                         waiting: stats.oWaiting || 0,
                         interacting: stats.oInteracting || 0,
-                        abandoned: stats.oAbandoned || 0,
-                        answered: stats.oAnswered || 0,
-                        avgWaitTime: stats.oWaitingAvgTime || 0,
-                        longestWait: stats.oWaitingMaxTime || 0
+                        alerting: stats.oAlerting || 0,
+                        longestWaiting: stats.oLongestWaiting || 0,
+                        activeUsers: stats.oActiveUsers || 0,
+                        onQueueUsers: stats.oOnQueueUsers || 0
                     }
                 };
             });
@@ -492,7 +492,7 @@ class QueueMonitor {
                         }
                     ]
                 },
-                metrics: ['oWaiting', 'oInteracting', 'oAbandoned', 'oAnswered', 'oWaitingAvgTime', 'oWaitingMaxTime']
+                metrics: ['oWaiting', 'oInteracting', 'oAlerting', 'oLongestWaiting', 'oActiveUsers', 'oOnQueueUsers']
             };
 
             const response = await this.analyticsApi.postAnalyticsQueuesObservationsQuery(query);
@@ -552,20 +552,20 @@ class QueueMonitor {
                             <span class="stat-label">Interacting</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-number">${queue.stats.answered || 0}</span>
-                            <span class="stat-label">Answered</span>
+                            <span class="stat-number">${queue.stats.alerting || 0}</span>
+                            <span class="stat-label">Alerting</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-number">${queue.stats.abandoned || 0}</span>
-                            <span class="stat-label">Abandoned</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">${this.formatTime(queue.stats.avgWaitTime)}</span>
-                            <span class="stat-label">Avg Wait</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">${this.formatTime(queue.stats.longestWait)}</span>
+                            <span class="stat-number">${this.formatTime(queue.stats.longestWaiting)}</span>
                             <span class="stat-label">Longest Wait</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${queue.stats.activeUsers || 0}</span>
+                            <span class="stat-label">Active Users</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${queue.stats.onQueueUsers || 0}</span>
+                            <span class="stat-label">On Queue</span>
                         </div>
                     </div>
                     
