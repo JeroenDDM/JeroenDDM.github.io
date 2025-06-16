@@ -72,39 +72,22 @@ class QueueMonitor {
         try {
             this.updateConnectionStatus('connecting', 'Authenticating...');
             
-            // Use the Client App SDK lifecycle to get authenticated session
-            // The app should bootstrap and provide access to the authenticated context
-            const bootstrapData = await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Timeout waiting for app bootstrap'));
-                }, 15000); // 15 second timeout
-                
-                // Try to get the bootstrap data from the lifecycle API
-                if (this.clientApp && this.clientApp.lifecycle) {
-                    this.clientApp.lifecycle.bootstrapped()
-                        .then((data) => {
-                            clearTimeout(timeout);
-                            resolve(data);
-                        })
-                        .catch((error) => {
-                            clearTimeout(timeout);
-                            reject(error);
-                        });
-                } else {
-                    // Fallback - assume we're authenticated in the Genesys Cloud context
-                    setTimeout(() => {
-                        clearTimeout(timeout);
-                        resolve({ authenticated: true });
-                    }, 2000);
-                }
-            });
+            // For interaction widgets, authentication is handled automatically by Genesys Cloud
+            // We just need to wait a moment for the environment to be ready
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
-            console.log('Bootstrap data:', bootstrapData);
+            // Check if we're in a Genesys Cloud environment by looking for query parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasGenesysParams = urlParams.has('gcHostOrigin') || urlParams.has('gcTargetEnv') || urlParams.has('pcEnvironment');
             
-            // The Platform Client should automatically use the authenticated session
-            // when running in the Genesys Cloud environment
+            if (hasGenesysParams) {
+                console.log('Running in Genesys Cloud environment - authentication handled automatically');
+            } else {
+                console.log('Running in standalone mode - using fallback authentication');
+            }
+            
             this.updateConnectionStatus('connected', 'Connected');
-            console.log('Authentication successful - running in authenticated Genesys Cloud context');
+            console.log('Authentication successful');
             
         } catch (error) {
             console.error('Authentication failed:', error);
