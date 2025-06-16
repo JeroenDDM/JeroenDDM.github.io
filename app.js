@@ -9,6 +9,14 @@ class QueueMonitor {
         this.refreshInterval = null;
         this.isLoading = false;
         
+        // OAuth Configuration - Replace with your actual OAuth app details
+        this.oauthConfig = {
+            clientId: 'YOUR_OAUTH_CLIENT_ID', // Replace with your OAuth client ID
+            redirectUri: window.location.origin + window.location.pathname, // Current page
+            environment: 'mypurecloud.ie', // Your Genesys Cloud environment
+            scopes: ['routing', 'analytics'] // Required permissions
+        };
+        
         this.initializeApp();
         this.setupEventListeners();
     }
@@ -263,12 +271,17 @@ class QueueMonitor {
                 }
                 
             } else {
-                console.log('[QueueMonitor] Running in standalone mode - would need OAuth client ID for implicit grant');
-                // In standalone mode, we would need to implement full OAuth flow
-                // For now, show a helpful message to the user
-                this.updateConnectionStatus('warning', 'Standalone Mode - No Authentication');
-                this.showError('This widget is running in standalone mode. To use it with live data, it needs to be deployed as a Genesys Cloud interaction widget with proper OAuth configuration.');
-                return { success: false, reason: 'standalone_mode' }; // Don't proceed with API calls without authentication
+                console.log('[QueueMonitor] Running in standalone mode - attempting OAuth authentication');
+                
+                // Check if we have a valid OAuth client ID configured
+                if (this.oauthConfig.clientId === 'YOUR_OAUTH_CLIENT_ID') {
+                    this.updateConnectionStatus('warning', 'OAuth Configuration Required');
+                    this.showError('To use this widget outside Genesys Cloud, you need to configure OAuth. Please set your OAuth Client ID in the code and ensure your app is registered in Genesys Cloud.');
+                    return { success: false, reason: 'oauth_not_configured' };
+                }
+                
+                // Try OAuth implicit grant flow
+                return await this.authenticateWithOAuth();
             }
             
             this.updateConnectionStatus('connected', 'Connected');
@@ -280,6 +293,67 @@ class QueueMonitor {
             this.updateConnectionStatus('error', 'Authentication failed');
             return { success: false, reason: 'authentication_error', error: error.message };
         }
+    }
+
+    async authenticateWithOAuth() {
+        try {
+            console.log('[QueueMonitor] Starting OAuth implicit grant flow');
+            this.updateConnectionStatus('connecting', 'Authenticating with OAuth...');
+            
+            const client = this.platformClient.ApiClient.instance;
+            
+            // Check if we already have a token from URL hash (OAuth redirect)
+            const hash = window.location.hash;
+            if (hash && hash.includes('access_token')) {
+                const hashParams = new URLSearchParams(hash.substring(1));
+                const accessToken = hashParams.get('access_token');
+                
+                if (accessToken) {
+                    console.log('[QueueMonitor] Found OAuth access token in URL hash');
+                    client.setAccessToken(accessToken);
+                    
+                    // Clean up the URL hash
+                    window.history.replaceState(null, null, window.location.pathname + window.location.search);
+                    
+                    this.updateConnectionStatus('connected', 'Connected via OAuth');
+                    return { success: true };
+                }
+            }
+            
+            // No token found, initiate OAuth flow
+            console.log('[QueueMonitor] No token found, redirecting to OAuth authorization');
+            
+            const authUrl = this.buildOAuthUrl();
+            console.log('[QueueMonitor] Redirecting to:', authUrl);
+            
+            // Show user-friendly message before redirect
+            this.updateConnectionStatus('connecting', 'Redirecting to Genesys Cloud...');
+            this.showError('You will be redirected to Genesys Cloud to authorize this application. Please log in and grant the requested permissions.');
+            
+            // Redirect after a short delay to let user see the message
+            setTimeout(() => {
+                window.location.href = authUrl;
+            }, 2000);
+            
+            return { success: false, reason: 'oauth_redirect_pending' };
+            
+        } catch (error) {
+            console.error('[QueueMonitor] OAuth authentication failed:', error);
+            this.updateConnectionStatus('error', 'OAuth Authentication Failed');
+            return { success: false, reason: 'oauth_error', error: error.message };
+        }
+    }
+    
+    buildOAuthUrl() {
+        const baseUrl = `https://login.${this.oauthConfig.environment}/oauth/authorize`;
+        const params = new URLSearchParams({
+            response_type: 'token',
+            client_id: this.oauthConfig.clientId,
+            redirect_uri: this.oauthConfig.redirectUri,
+            scope: this.oauthConfig.scopes.join(' ')
+        });
+        
+        return `${baseUrl}?${params.toString()}`;
     }
 
     async loadQueues() {
