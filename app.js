@@ -444,11 +444,11 @@ class QueueMonitor {
                 const stats = queueStats[queue.id] || {};
                 console.log(`[QueueMonitor] Queue "${queue.name}" (${queue.id}) raw stats:`, stats);
                 const processedStats = {
-                    waiting: stats.oWaiting || 0,
-                    interacting: stats.oInteracting || 0,
-                    alerting: stats.oAlerting || 0,
-                    activeUsers: stats.oActiveUsers || 0,
-                    onQueueUsers: stats.oOnQueueUsers || 0
+                    waiting: stats.waiting || 0,
+                    interacting: stats.interacting || 0,
+                    alerting: stats.alerting || 0,
+                    activeUsers: stats.activeUsers || 0,
+                    onQueueUsers: stats.onQueueUsers || 0
                 };
                 console.log(`[QueueMonitor] Queue "${queue.name}" processed stats:`, processedStats);
                 return {
