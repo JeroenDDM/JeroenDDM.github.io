@@ -8,6 +8,7 @@ class QueueMonitor {
         this.filteredQueues = [];
         this.refreshInterval = null;
         this.isLoading = false;
+        this.currentSearchTerm = '';
         
         // OAuth Configuration - Replace with your actual OAuth app details
         this.oauthConfig = {
@@ -457,8 +458,8 @@ class QueueMonitor {
                 };
             });
 
-            this.filteredQueues = [...this.queues];
-            this.renderQueues();
+            // Reapply current filter after loading new data
+            this.filterQueues(this.currentSearchTerm);
             this.updateLastRefreshTime();
             
         } catch (error) {
@@ -608,14 +609,6 @@ class QueueMonitor {
                             <span class="stat-label">Interacting</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-number">${queue.stats.alerting || 0}</span>
-                            <span class="stat-label">Alerting</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">${queue.stats.activeUsers || 0}</span>
-                            <span class="stat-label">Active Users</span>
-                        </div>
-                        <div class="stat-item">
                             <span class="stat-number">${queue.stats.onQueueUsers || 0}</span>
                             <span class="stat-label">On Queue</span>
                         </div>
@@ -712,6 +705,7 @@ class QueueMonitor {
     }
 
     filterQueues(searchTerm) {
+        this.currentSearchTerm = searchTerm;
         if (!searchTerm.trim()) {
             this.filteredQueues = [...this.queues];
         } else {
