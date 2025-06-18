@@ -204,9 +204,12 @@ body {
 
 /* Queue container */
 .queue-container {
-    padding: 16px;
+    padding: 12px;
     max-height: calc(100vh - 280px);
     overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 8px;
 }
 
 /* Queue item */
@@ -214,10 +217,10 @@ body {
     background: white;
     border: 1px solid #e9ecef;
     border-radius: 6px;
-    margin-bottom: 8px;
-    padding: 12px;
+    padding: 10px;
     transition: all 0.3s ease;
     cursor: pointer;
+    min-height: 100px;
 }
 
 .queue-item:hover {
@@ -240,27 +243,30 @@ body {
 .queue-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 8px;
+    align-items: center;
+    margin-bottom: 6px;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
 }
 
 .queue-name {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: #333;
     margin: 0;
     flex: 1;
     min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .queue-badge {
     background: #667eea;
     color: white;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
     font-weight: 500;
     white-space: nowrap;
 }
@@ -281,13 +287,13 @@ body {
 .queue-stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-top: 8px;
+    gap: 6px;
+    margin-top: 6px;
 }
 
 .stat-item {
     text-align: center;
-    padding: 6px;
+    padding: 4px;
     background: #f8f9fa;
     border-radius: 4px;
     border: 1px solid #e9ecef;
@@ -295,17 +301,17 @@ body {
 
 .stat-number {
     display: block;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: #333;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
 }
 
 .stat-label {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: #6c757d;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
 }
 
 .queue-description {
@@ -333,13 +339,24 @@ body {
         text-align: center;
     }
     
-    .queue-header {
-        flex-direction: column;
-        align-items: stretch;
+    .queue-container {
+        grid-template-columns: 1fr;
     }
     
     .queue-stats {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+    .queue-container {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1201px) {
+    .queue-container {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 
