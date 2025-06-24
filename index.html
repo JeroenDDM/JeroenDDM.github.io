@@ -57,6 +57,55 @@
         </div>
     </div>
 
+    <!-- Transfer Modal -->
+    <div id="transferModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Transfer Call</h3>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="queue-info">
+                    <h4 id="selectedQueueName">Queue Name</h4>
+                    <p id="selectedQueueDescription">Queue description will appear here</p>
+                    <div class="queue-status">
+                        <span class="status-item">
+                            <strong>Waiting:</strong> <span id="modalWaitingCount">0</span>
+                        </span>
+                        <span class="status-item">
+                            <strong>Available Agents:</strong> <span id="modalAgentCount">0</span>
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="transfer-options">
+                    <button class="transfer-btn blind-transfer" id="blindTransferBtn">
+                        <span class="btn-icon">📞</span>
+                        <div class="btn-content">
+                            <strong>Blind Transfer</strong>
+                            <small>Transfer call directly to queue</small>
+                        </div>
+                    </button>
+                    
+                    <button class="transfer-btn consult-transfer" id="consultTransferBtn">
+                        <span class="btn-icon">👥</span>
+                        <div class="btn-content">
+                            <strong>Consult Transfer</strong>
+                            <small>Speak with agent before transferring</small>
+                        </div>
+                    </button>
+                </div>
+                
+                <div class="transfer-status" id="transferStatus" style="display: none;">
+                    <div class="status-message">
+                        <span class="spinner-small"></span>
+                        <span id="transferStatusText">Processing transfer...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://sdk-cdn.mypurecloud.com/client-apps/2.6.7/purecloud-client-app-sdk.js"></script>
     <script src="https://sdk-cdn.mypurecloud.com/javascript/223.0.0/purecloud-platform-client-v2.min.js"></script>

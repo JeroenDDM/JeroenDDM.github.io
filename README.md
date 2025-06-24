@@ -6,6 +6,9 @@ A real-time queue monitoring widget for Genesys Cloud agents that displays queue
 
 - **Real-time Queue Statistics**: Monitor waiting customers, active interactions, and queue performance
 - **Visual Priority Indicators**: Color-coded queues based on waiting customer count
+- **Call Transfer Controls**: Click on any queue to transfer active calls
+  - 📞 **Blind Transfer**: Transfer call directly to the selected queue
+  - 👥 **Consult Transfer**: Speak with an agent before completing the transfer
 - **Auto-refresh**: Automatically updates every 30 seconds
 - **Search Functionality**: Filter queues by name or description
 - **Responsive Design**: Works on desktop and mobile devices
@@ -51,6 +54,7 @@ A real-time queue monitoring widget for Genesys Cloud agents that displays queue
    - Grant the integration the following permissions:
      - `routing` - To access queue information
      - `analytics` - To retrieve queue statistics
+     - `conversations` - To enable call transfer functionality
 
 4. **Activate the Integration**
    - Install the integration in your organization
@@ -71,6 +75,11 @@ A real-time queue monitoring widget for Genesys Cloud agents that displays queue
 
 4. **Search Queues**
    - Use the search box to filter queues by name or description
+
+5. **Transfer Calls**
+   - Click on any queue to open the transfer modal
+   - Choose between blind transfer (immediate) or consult transfer (speak first)
+   - Transfer is only available during active interactions
 
 ## Technical Details
 
@@ -129,6 +138,7 @@ The widget uses the following Genesys Cloud APIs:
 
 - **Routing API**: `getRoutingQueues()` - Retrieves queue configuration
 - **Analytics API**: `postAnalyticsQueuesObservationsQuery()` - Gets real-time statistics
+- **Conversations API**: `postConversationTransfer()` - Handles call transfers
 
 ## Troubleshooting
 

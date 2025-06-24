@@ -4,18 +4,21 @@ class QueueMonitor {
         this.clientApp = null;
         this.routingApi = null;
         this.analyticsApi = null;
+        this.conversationsApi = null;
         this.queues = [];
         this.filteredQueues = [];
         this.refreshInterval = null;
         this.isLoading = false;
         this.currentSearchTerm = '';
+        this.currentConversationId = null;
+        this.selectedQueue = null;
         
         // OAuth Configuration - Replace with your actual OAuth app details
         this.oauthConfig = {
             clientId: '110d379d-9f0d-452f-8706-e8975a058f7f', // Replace with your OAuth client ID
             redirectUri: 'https://jeroenddm.github.io/', // Current page
             environment: 'mypurecloud.ie', // Your Genesys Cloud environment
-            scopes: ['routing', 'analytics'] // Required permissions
+            scopes: ['routing', 'analytics', 'conversations'] // Required permissions
         };
         
         this.initializeApp();
@@ -78,6 +81,7 @@ class QueueMonitor {
             // Get APIs
             this.routingApi = new this.platformClient.RoutingApi();
             this.analyticsApi = new this.platformClient.AnalyticsApi();
+            this.conversationsApi = new this.platformClient.ConversationsApi();
 
             // Set up authentication using Client App SDK
             const authResult = await this.authenticateWithGenesys();
@@ -675,6 +679,34 @@ class QueueMonitor {
                 this.handleQueueClick(queueItem.dataset.queueId);
             }
         });
+
+        // Modal event listeners
+        document.getElementById('closeModal').addEventListener('click', () => {
+            this.hideTransferModal();
+        });
+
+        // Close modal when clicking outside of it
+        document.getElementById('transferModal').addEventListener('click', (e) => {
+            if (e.target.id === 'transferModal') {
+                this.hideTransferModal();
+            }
+        });
+
+        // Transfer button event listeners
+        document.getElementById('blindTransferBtn').addEventListener('click', () => {
+            this.performBlindTransfer();
+        });
+
+        document.getElementById('consultTransferBtn').addEventListener('click', () => {
+            this.performConsultTransfer();
+        });
+
+        // ESC key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('transferModal').style.display === 'flex') {
+                this.hideTransferModal();
+            }
+        });
     }
 
     async refreshQueues() {
@@ -719,13 +751,168 @@ class QueueMonitor {
     }
 
     handleQueueClick(queueId) {
-        // This can be extended to show queue details or perform actions
-                    console.log('[QueueMonitor] Queue clicked:', queueId);
+        console.log('[QueueMonitor] Queue clicked:', queueId);
         
-        // You can implement additional functionality here, such as:
-        // - Opening queue details in a modal
-        // - Navigating to queue management
-        // - Showing historical data
+        // Find the selected queue
+        this.selectedQueue = this.queues.find(queue => queue.id === queueId);
+        if (!this.selectedQueue) {
+            console.error('[QueueMonitor] Queue not found:', queueId);
+            return;
+        }
+        
+        // Show the transfer modal
+        this.showTransferModal();
+    }
+
+    showTransferModal() {
+        if (!this.selectedQueue) return;
+        
+        // Populate modal with queue information
+        document.getElementById('selectedQueueName').textContent = this.selectedQueue.name;
+        document.getElementById('selectedQueueDescription').textContent = 
+            this.selectedQueue.description || 'No description available';
+        document.getElementById('modalWaitingCount').textContent = 
+            this.selectedQueue.stats.waiting || 0;
+        document.getElementById('modalAgentCount').textContent = 
+            this.selectedQueue.stats.onQueueUsers || 0;
+        
+        // Show the modal
+        document.getElementById('transferModal').style.display = 'flex';
+        
+        // Get current conversation ID from the Client App SDK
+        this.getCurrentConversation();
+    }
+
+    hideTransferModal() {
+        document.getElementById('transferModal').style.display = 'none';
+        this.selectedQueue = null;
+        this.hideTransferStatus();
+    }
+
+    showTransferStatus(message) {
+        document.getElementById('transferStatusText').textContent = message;
+        document.getElementById('transferStatus').style.display = 'block';
+    }
+
+    hideTransferStatus() {
+        document.getElementById('transferStatus').style.display = 'none';
+    }
+
+    async getCurrentConversation() {
+        try {
+            // Try to get conversation ID from the Client App SDK
+            if (this.clientApp && this.clientApp.getConversation) {
+                const conversation = await this.clientApp.getConversation();
+                if (conversation && conversation.conversationId) {
+                    this.currentConversationId = conversation.conversationId;
+                    console.log('[QueueMonitor] Found conversation ID:', this.currentConversationId);
+                    return;
+                }
+            }
+            
+            // Alternative: Check URL parameters for conversation/interaction ID
+            const urlParams = new URLSearchParams(window.location.search);
+            const conversationId = urlParams.get('conversationId') || 
+                                 urlParams.get('iid') || 
+                                 urlParams.get('interactionId');
+            
+            if (conversationId) {
+                this.currentConversationId = conversationId;
+                console.log('[QueueMonitor] Found conversation ID from URL:', this.currentConversationId);
+            } else {
+                console.warn('[QueueMonitor] No active conversation found');
+            }
+        } catch (error) {
+            console.error('[QueueMonitor] Error getting conversation:', error);
+        }
+    }
+
+    async performBlindTransfer() {
+        if (!this.selectedQueue || !this.currentConversationId) {
+            this.showError('Unable to transfer: No active conversation or queue selected');
+            return;
+        }
+        
+        try {
+            this.showTransferStatus('Initiating blind transfer...');
+            
+            // Prepare transfer request
+            const transferRequest = {
+                transferType: 'Blind',
+                destination: {
+                    queueId: this.selectedQueue.id
+                }
+            };
+            
+            console.log('[QueueMonitor] Performing blind transfer:', transferRequest);
+            
+            // Execute the transfer using Conversations API
+            const result = await this.conversationsApi.postConversationTransfer(
+                this.currentConversationId, 
+                transferRequest
+            );
+            
+            console.log('[QueueMonitor] Transfer successful:', result);
+            this.showTransferStatus('Transfer completed successfully!');
+            
+            // Auto-close modal after success
+            setTimeout(() => {
+                this.hideTransferModal();
+            }, 2000);
+            
+        } catch (error) {
+            console.error('[QueueMonitor] Blind transfer failed:', error);
+            this.showTransferStatus('Transfer failed: ' + (error.message || 'Unknown error'));
+            
+            // Auto-hide status after error
+            setTimeout(() => {
+                this.hideTransferStatus();
+            }, 3000);
+        }
+    }
+
+    async performConsultTransfer() {
+        if (!this.selectedQueue || !this.currentConversationId) {
+            this.showError('Unable to transfer: No active conversation or queue selected');
+            return;
+        }
+        
+        try {
+            this.showTransferStatus('Initiating consult transfer...');
+            
+            // Prepare consult transfer request
+            const consultRequest = {
+                transferType: 'Consult',
+                destination: {
+                    queueId: this.selectedQueue.id
+                }
+            };
+            
+            console.log('[QueueMonitor] Performing consult transfer:', consultRequest);
+            
+            // Execute the consult transfer using Conversations API
+            const result = await this.conversationsApi.postConversationTransfer(
+                this.currentConversationId, 
+                consultRequest
+            );
+            
+            console.log('[QueueMonitor] Consult transfer initiated:', result);
+            this.showTransferStatus('Consult transfer initiated. You will be connected to speak with an agent.');
+            
+            // Auto-close modal after success
+            setTimeout(() => {
+                this.hideTransferModal();
+            }, 3000);
+            
+        } catch (error) {
+            console.error('[QueueMonitor] Consult transfer failed:', error);
+            this.showTransferStatus('Transfer failed: ' + (error.message || 'Unknown error'));
+            
+            // Auto-hide status after error
+            setTimeout(() => {
+                this.hideTransferStatus();
+            }, 3000);
+        }
     }
 
     updateConnectionStatus(status, message) {
