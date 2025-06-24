@@ -447,7 +447,7 @@ class QueueMonitor {
             // Combine queue info with statistics
             this.queues = queuesResponse.entities.map(queue => {
                 const stats = queueStats[queue.id] || {};
-                console.log(`[QueueMonitor] Queue "${queue.name}" (${queue.id}) raw stats:`, stats);
+                // console.log(`[QueueMonitor] Queue "${queue.name}" (${queue.id}) raw stats:`, stats);
                 const processedStats = {
                     waiting: stats.waiting || 0,
                     interacting: stats.interacting || 0,
@@ -455,7 +455,7 @@ class QueueMonitor {
                     activeUsers: stats.activeUsers || 0,
                     onQueueUsers: stats.onQueueUsers || 0
                 };
-                console.log(`[QueueMonitor] Queue "${queue.name}" processed stats:`, processedStats);
+                // console.log(`[QueueMonitor] Queue "${queue.name}" processed stats:`, processedStats);
                 return {
                     ...queue,
                     stats: processedStats
@@ -507,12 +507,12 @@ class QueueMonitor {
             const response = await this.analyticsApi.postAnalyticsQueuesObservationsQuery(query);
             
             // Debug: Log the full response structure
-            console.log('[QueueMonitor] Analytics API response:', response);
+            // console.log('[QueueMonitor] Analytics API response:', response);
             
             // Process the response to create a lookup by queue ID
             const stats = {};
             if (response && response.results) {
-                console.log('[QueueMonitor] Processing', response.results.length, 'results');
+                // console.log('[QueueMonitor] Processing', response.results.length, 'results');
                 
                 // Initialize stats for all queues
                 queueIds.forEach(queueId => {
@@ -526,19 +526,19 @@ class QueueMonitor {
                 });
                 
                 response.results.forEach((result, index) => {
-                    console.log(`[QueueMonitor] Result ${index}:`, result);
+                    // console.log(`[QueueMonitor] Result ${index}:`, result);
                     if (result.group && result.group.queueId && result.data) {
                         const queueId = result.group.queueId;
                         const mediaType = result.group.mediaType;
                         
-                        console.log(`[QueueMonitor] Processing queue ${queueId}, mediaType: ${mediaType || 'none'}`);
+                        // console.log(`[QueueMonitor] Processing queue ${queueId}, mediaType: ${mediaType || 'none'}`);
                         
                         // Process each metric in the data array
                         result.data.forEach(dataItem => {
                             const metric = dataItem.metric;
                             const count = dataItem.stats ? dataItem.stats.count : 0;
                             
-                            console.log(`[QueueMonitor] Queue ${queueId}, metric: ${metric}, count: ${count}, qualifier: ${dataItem.qualifier || 'none'}`);
+                            // console.log(`[QueueMonitor] Queue ${queueId}, metric: ${metric}, count: ${count}, qualifier: ${dataItem.qualifier || 'none'}`);
                             
                             // Map metrics to our stats object (voice media type only)
                             switch (metric) {
@@ -561,13 +561,13 @@ class QueueMonitor {
                             }
                         });
                         
-                        console.log(`[QueueMonitor] Queue ${queueId} current stats:`, stats[queueId]);
+                        // console.log(`[QueueMonitor] Queue ${queueId} current stats:`, stats[queueId]);
                     }
                 });
                 
-                console.log('[QueueMonitor] Final aggregated stats:', stats);
+                // console.log('[QueueMonitor] Final aggregated stats:', stats);
             } else {
-                console.log('[QueueMonitor] No results in analytics response');
+                // console.log('[QueueMonitor] No results in analytics response');
             }
 
             return stats;
