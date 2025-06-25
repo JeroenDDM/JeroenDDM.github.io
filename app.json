@@ -16,7 +16,7 @@
       "name": "Queue Monitor Widget",
       "type": "interactionWidget",
       "displayName": "Queue Monitor",
-      "url": "index.html",
+      "url": "index.html?gcHostOrigin={{gcHostOrigin}}&gcTargetEnv={{gcTargetEnv}}&iid={{iid}}&locale={{locale}}&environment={{pcEnvironment}}",
       "sandbox": "allow-same-origin allow-scripts allow-popups allow-forms",
       "interactionTypes": ["voice", "chat", "email", "callback", "message"],
       "icon": {

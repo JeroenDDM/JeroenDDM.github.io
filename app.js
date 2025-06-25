@@ -110,6 +110,7 @@ class QueueMonitor {
             const hasGenesysQueryParams = urlParams.has('gcHostOrigin') || 
                                          urlParams.has('gcTargetEnv') || 
                                          urlParams.has('pcEnvironment') ||
+                                         urlParams.has('environment') || // interpolated environment parameter
                                          urlParams.has('iid') || // interaction ID
                                          urlParams.has('host') || // host parameter
                                          urlParams.has('locale'); // locale parameter
@@ -130,6 +131,7 @@ class QueueMonitor {
                 gcHostOrigin: urlParams.get('gcHostOrigin'),
                 gcTargetEnv: urlParams.get('gcTargetEnv'),
                 pcEnvironment: urlParams.get('pcEnvironment'),
+                environment: urlParams.get('environment'),
                 iid: urlParams.get('iid'),
                 host: urlParams.get('host'),
                 locale: urlParams.get('locale'),
@@ -760,8 +762,36 @@ class QueueMonitor {
             return;
         }
         
-        // Show the transfer modal
-        this.showTransferModal();
+        // Check if we're in standalone mode
+        if (this.isStandalone) {
+            this.showQueueDetails();
+        } else {
+            // Show the transfer modal (for interaction widget mode)
+            this.showTransferModal();
+        }
+    }
+
+    showQueueDetails() {
+        if (!this.selectedQueue) return;
+        
+        // Show detailed queue information in standalone mode
+        const stats = this.selectedQueue.stats;
+        const queueInfo = `
+Queue: ${this.selectedQueue.name}
+Description: ${this.selectedQueue.description || 'No description available'}
+
+Current Statistics:
+• Waiting: ${stats.waiting || 0} customers
+• Agents on queue: ${stats.onQueueUsers || 0}
+• Interacting: ${stats.interacting || 0}
+• Answered today: ${stats.answered || 0}
+• Abandoned today: ${stats.abandoned || 0}
+• Average wait time: ${this.formatTime(stats.avgWaitTime || 0)}
+
+Note: Transfer functionality is only available when running as a Genesys Cloud interaction widget.
+        `.trim();
+        
+        alert(queueInfo);
     }
 
     showTransferModal() {
@@ -800,9 +830,16 @@ class QueueMonitor {
 
     async getCurrentConversation() {
         try {
+            console.log('[QueueMonitor] Attempting to get current conversation...');
+            console.log('[QueueMonitor] Client App available:', !!this.clientApp);
+            console.log('[QueueMonitor] Running in standalone mode:', this.isStandalone);
+            
             // Try to get conversation ID from the Client App SDK
             if (this.clientApp && this.clientApp.getConversation) {
+                console.log('[QueueMonitor] Trying Client App SDK getConversation...');
                 const conversation = await this.clientApp.getConversation();
+                console.log('[QueueMonitor] Client App SDK response:', conversation);
+                
                 if (conversation && conversation.conversationId) {
                     this.currentConversationId = conversation.conversationId;
                     console.log('[QueueMonitor] Found conversation ID:', this.currentConversationId);
@@ -816,11 +853,27 @@ class QueueMonitor {
                                  urlParams.get('iid') || 
                                  urlParams.get('interactionId');
             
+            console.log('[QueueMonitor] URL parameters check:', {
+                conversationId: urlParams.get('conversationId'),
+                iid: urlParams.get('iid'),
+                interactionId: urlParams.get('interactionId')
+            });
+            
+            // Also check for the interpolated interaction ID parameter
+            const interpolatedIid = urlParams.get('iid');
+            if (interpolatedIid) {
+                console.log('[QueueMonitor] Found interpolated interaction ID:', interpolatedIid);
+            }
+            
             if (conversationId) {
                 this.currentConversationId = conversationId;
                 console.log('[QueueMonitor] Found conversation ID from URL:', this.currentConversationId);
             } else {
-                console.warn('[QueueMonitor] No active conversation found');
+                if (this.isStandalone) {
+                    console.log('[QueueMonitor] No active conversation found - running in standalone mode');
+                } else {
+                    console.warn('[QueueMonitor] No active conversation found - this may indicate the widget is not properly integrated');
+                }
             }
         } catch (error) {
             console.error('[QueueMonitor] Error getting conversation:', error);
@@ -828,8 +881,17 @@ class QueueMonitor {
     }
 
     async performBlindTransfer() {
-        if (!this.selectedQueue || !this.currentConversationId) {
-            this.showError('Unable to transfer: No active conversation or queue selected');
+        if (!this.selectedQueue) {
+            this.showTransferStatus('Error: No queue selected');
+            return;
+        }
+        
+        if (!this.currentConversationId) {
+            if (this.isStandalone) {
+                this.showTransferStatus('Transfer not available in standalone mode. This feature requires the widget to be embedded in Genesys Cloud.');
+            } else {
+                this.showTransferStatus('Error: No active conversation found');
+            }
             return;
         }
         
@@ -872,8 +934,17 @@ class QueueMonitor {
     }
 
     async performConsultTransfer() {
-        if (!this.selectedQueue || !this.currentConversationId) {
-            this.showError('Unable to transfer: No active conversation or queue selected');
+        if (!this.selectedQueue) {
+            this.showTransferStatus('Error: No queue selected');
+            return;
+        }
+        
+        if (!this.currentConversationId) {
+            if (this.isStandalone) {
+                this.showTransferStatus('Transfer not available in standalone mode. This feature requires the widget to be embedded in Genesys Cloud.');
+            } else {
+                this.showTransferStatus('Error: No active conversation found');
+            }
             return;
         }
         
