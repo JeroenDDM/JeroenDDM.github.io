@@ -141,9 +141,19 @@ class QueueMonitor {
                 isGenesysDomain: isGenesysDomain,
                 hasGenesysParams: hasGenesysParams
             });
+
+            // Additional debugging for iframe context
+            if (isInIframe && !hasGenesysQueryParams) {
+                console.log('[QueueMonitor] NOTICE: Running in iframe but no Genesys parameters detected.');
+                console.log('[QueueMonitor] This usually means:');
+                console.log('[QueueMonitor] 1. App is being tested in an iframe but not through Genesys Cloud integration');
+                console.log('[QueueMonitor] 2. URL interpolation is not working (check app.json and integration setup)');
+                console.log('[QueueMonitor] 3. App needs to be accessed through Genesys Cloud Admin integration, not directly');
+            }
             
             if (hasGenesysParams) {
                 console.log('[QueueMonitor] Running in Genesys Cloud environment - using implicit grant authentication');
+                this.isStandalone = false;
                 
                 // For interaction widgets, we can use implicit grant authentication
                 // The widget should already have access to the authenticated session
@@ -279,6 +289,7 @@ class QueueMonitor {
                 
             } else {
                 console.log('[QueueMonitor] Running in standalone mode - attempting OAuth authentication');
+                this.isStandalone = true;
                 
                 // Check if we have a valid OAuth client ID configured
                 if (this.oauthConfig.clientId === 'YOUR_OAUTH_CLIENT_ID' || !this.oauthConfig.clientId) {
