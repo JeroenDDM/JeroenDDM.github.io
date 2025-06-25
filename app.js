@@ -377,37 +377,75 @@ class QueueMonitor {
                                     // For widgets, we need to check if there are available methods on the Client App SDK
                                     console.log('[QueueMonitor] Available Client App SDK methods:', Object.keys(this.clientApp));
                                     
-                                    // Try different approaches to verify authentication
-                                    let authVerified = false;
-                                    
-                                    // Method 1: Try alerting (basic Client App SDK method)
-                                    if (typeof this.clientApp.alerting === 'function') {
-                                        console.log('[QueueMonitor] Client App SDK alerting method available');
-                                        authVerified = true;
-                                    }
-                                    
-                                    // Method 2: Check if we have any methods available
-                                    if (typeof this.clientApp.lifecycle === 'object') {
-                                        console.log('[QueueMonitor] Client App SDK lifecycle available');
-                                        authVerified = true;
-                                    }
-                                    
-                                    if (authVerified) {
-                                        console.log('[QueueMonitor] Client App SDK context verified');
+                                    // Try to get user information via Client App SDK
+                                    if (this.clientApp.users && typeof this.clientApp.users.me === 'function') {
+                                        console.log('[QueueMonitor] Attempting to get user info via Client App SDK...');
+                                        const userInfo = await this.clientApp.users.me();
+                                        console.log('[QueueMonitor] Client App SDK user info retrieved:', userInfo);
                                         
-                                        // For Genesys Cloud widgets, the Platform Client should inherit authentication
-                                        // Try a direct API call - it should work in widget context
-                                        console.log('[QueueMonitor] Testing API access in widget context...');
+                                        // If we can get user info, we're authenticated in the widget context
+                                        console.log('[QueueMonitor] Widget authentication verified via Client App SDK');
                                         
-                                        // Configure the client with proper environment but let it inherit auth
-                                        client.basePath = undefined; // Let it use default
+                                        // Now try to use the Platform Client in widget mode
+                                        // Reset client configuration for widget context
+                                        client.basePath = undefined;
                                         
-                                        const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                                        // For widgets, we might need to configure the Platform Client differently
+                                        // Try setting up authentication token from the widget context
+                                        console.log('[QueueMonitor] Configuring Platform Client for widget mode...');
                                         
-                                        if (testResponse) {
-                                            console.log('[QueueMonitor] ✅ Widget authentication successful!');
-                                            this.updateConnectionStatus('connected', 'Connected via Genesys Cloud Widget');
-                                            return { success: true };
+                                        // Check if there's a way to get the auth token from Client App SDK
+                                        if (userInfo && userInfo.id) {
+                                            console.log('[QueueMonitor] User authenticated with ID:', userInfo.id);
+                                            
+                                            // Try different authentication configurations for widgets
+                                            try {
+                                                // Method A: Try without explicit token (widget inherits auth)
+                                                console.log('[QueueMonitor] Testing inherited authentication...');
+                                                const testResponse1 = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                                                if (testResponse1) {
+                                                    console.log('[QueueMonitor] ✅ Widget authentication successful with inherited auth!');
+                                                    this.updateConnectionStatus('connected', 'Connected via Inherited Auth');
+                                                    return { success: true };
+                                                }
+                                            } catch (inheritError) {
+                                                console.log('[QueueMonitor] Inherited auth failed:', inheritError.message);
+                                            }
+                                            
+                                            // Method B: Try using Client App SDK for API calls
+                                            if (this.clientApp.directory && typeof this.clientApp.directory.getUsers === 'function') {
+                                                console.log('[QueueMonitor] Testing Client App SDK API access...');
+                                                try {
+                                                    const directoryTest = await this.clientApp.directory.getUsers({ pageSize: 1 });
+                                                    console.log('[QueueMonitor] ✅ Client App SDK API access working!');
+                                                    
+                                                    // If Client App SDK works, we can use it for all API calls
+                                                    this.useClientAppSDK = true;
+                                                    this.updateConnectionStatus('connected', 'Connected via Client App SDK');
+                                                    return { success: true };
+                                                } catch (sdkError) {
+                                                    console.log('[QueueMonitor] Client App SDK API failed:', sdkError.message);
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        console.log('[QueueMonitor] Client App SDK users.me method not available');
+                                        
+                                        // Fallback: try lifecycle management
+                                        if (typeof this.clientApp.lifecycle === 'object') {
+                                            console.log('[QueueMonitor] Using Client App SDK lifecycle for authentication');
+                                            
+                                            // Configure client for widget mode
+                                            client.basePath = undefined;
+                                            
+                                            // Test API call with lifecycle context
+                                            const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                                            
+                                            if (testResponse) {
+                                                console.log('[QueueMonitor] ✅ Widget authentication successful via lifecycle!');
+                                                this.updateConnectionStatus('connected', 'Connected via Widget Lifecycle');
+                                                return { success: true };
+                                            }
                                         }
                                     }
                                 } catch (sessionError) {
@@ -600,25 +638,47 @@ class QueueMonitor {
             this.showLoading(true);
             this.hideError();
             
-            // Debug: Check authentication state before making API calls
-            const client = this.platformClient.ApiClient.instance;
-            const currentToken = client.authentications?.PureCloud?.accessToken;
-            const authHeader = client.defaultHeaders?.['Authorization'];
-            console.log('[QueueMonitor] Making API call with:');
-            console.log('  - Token:', currentToken ? (currentToken.substring(0, 20) + '...') : 'NO TOKEN');
-            console.log('  - Auth Header:', authHeader ? (authHeader.substring(0, 27) + '...') : 'NO HEADER');
-            console.log('  - Base Path:', client.basePath || 'NOT SET');
+            let queuesResponse;
             
-            // If no token and no auth header, don't make API calls
-            if (!currentToken && !authHeader) {
-                throw new Error('No authentication token available - cannot make API calls');
+            // Check if we should use Client App SDK instead of Platform Client
+            if (this.useClientAppSDK && this.clientApp) {
+                console.log('[QueueMonitor] Using Client App SDK for API calls...');
+                
+                // Use Client App SDK for queue data
+                try {
+                    queuesResponse = await this.clientApp.routing.getQueues({
+                        pageSize: 100,
+                        sortBy: 'name'
+                    });
+                    console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK');
+                } catch (sdkError) {
+                    console.log('[QueueMonitor] Client App SDK queue loading failed:', sdkError.message);
+                    throw new Error('Failed to load queues via Client App SDK: ' + sdkError.message);
+                }
+            } else {
+                // Use Platform Client (original method)
+                console.log('[QueueMonitor] Using Platform Client for API calls...');
+                
+                // Debug: Check authentication state before making API calls
+                const client = this.platformClient.ApiClient.instance;
+                const currentToken = client.authentications?.PureCloud?.accessToken;
+                const authHeader = client.defaultHeaders?.['Authorization'];
+                console.log('[QueueMonitor] Making API call with:');
+                console.log('  - Token:', currentToken ? (currentToken.substring(0, 20) + '...') : 'NO TOKEN');
+                console.log('  - Auth Header:', authHeader ? (authHeader.substring(0, 27) + '...') : 'NO HEADER');
+                console.log('  - Base Path:', client.basePath || 'NOT SET');
+                
+                // If no token and no auth header, don't make API calls
+                if (!currentToken && !authHeader) {
+                    throw new Error('No authentication token available - cannot make API calls');
+                }
+                
+                // Fetch all queues
+                queuesResponse = await this.routingApi.getRoutingQueues({
+                    pageSize: 100,
+                    sortBy: 'name'
+                });
             }
-            
-            // Fetch all queues
-            const queuesResponse = await this.routingApi.getRoutingQueues({
-                pageSize: 100,
-                sortBy: 'name'
-            });
             
             if (!queuesResponse || !queuesResponse.entities) {
                 throw new Error('No queue data received');
