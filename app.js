@@ -111,9 +111,11 @@ class QueueMonitor {
                                          urlParams.has('gcTargetEnv') || 
                                          urlParams.has('pcEnvironment') ||
                                          urlParams.has('environment') || // interpolated environment parameter
-                                         urlParams.has('iid') || // interaction ID
+                                         urlParams.has('conversationId') || // conversation ID (new format)
+                                         urlParams.has('iid') || // interaction ID (legacy)
                                          urlParams.has('host') || // host parameter
-                                         urlParams.has('locale'); // locale parameter
+                                         urlParams.has('langTag') || // language tag (new format)
+                                         urlParams.has('locale'); // locale parameter (legacy)
             
             const isGenesysDomain = window.location.hostname.includes('mypurecloud') || // running on Genesys Cloud domain
                                    window.location.hostname.includes('apps.'); // apps subdomain
@@ -131,7 +133,7 @@ class QueueMonitor {
             // Log URL interpolation analysis
             console.log('[QueueMonitor] === URL INTERPOLATION ANALYSIS ===');
             console.log('[QueueMonitor] Expected interpolated URL format:');
-            console.log('[QueueMonitor] https://jeroenddm.github.io/index.html?gcHostOrigin={{gcHostOrigin}}&gcTargetEnv={{gcTargetEnv}}&iid={{iid}}&locale={{locale}}&environment={{pcEnvironment}}');
+            console.log('[QueueMonitor] https://jeroenddm.github.io/index.html?gcHostOrigin={{gcHostOrigin}}&gcTargetEnv={{gcTargetEnv}}&conversationId={{conversationId}}&langTag={{langTag}}&environment={{pcEnvironment}}');
             console.log('[QueueMonitor] ');
             console.log('[QueueMonitor] Actual URL received:', window.location.href);
             console.log('[QueueMonitor] ');
@@ -144,7 +146,7 @@ class QueueMonitor {
             } else {
                 console.log('[QueueMonitor] ❌ NO QUERY PARAMETERS FOUND');
                 console.log('[QueueMonitor] This indicates URL interpolation is not working.');
-                console.log('[QueueMonitor] Expected parameters: gcHostOrigin, gcTargetEnv, iid, locale, environment');
+                console.log('[QueueMonitor] Expected parameters: gcHostOrigin, gcTargetEnv, conversationId, langTag, environment');
             }
             console.log('[QueueMonitor] === END URL INTERPOLATION ANALYSIS ===');
             console.log('[QueueMonitor] ');
@@ -200,8 +202,8 @@ class QueueMonitor {
             const expectedParams = [
                 { name: 'gcHostOrigin', description: 'Genesys Cloud host origin' },
                 { name: 'gcTargetEnv', description: 'Target environment identifier' },
-                { name: 'iid', description: 'Interaction ID (for transfers)' },
-                { name: 'locale', description: 'User locale setting' },
+                { name: 'conversationId', description: 'Conversation ID (for transfers)' },
+                { name: 'langTag', description: 'Language tag setting' },
                 { name: 'environment', description: 'PureCloud environment name' },
                 { name: 'pcEnvironment', description: 'Legacy PureCloud environment' }
             ];
@@ -323,18 +325,31 @@ class QueueMonitor {
                         return { success: true };
                     }
                     
-                    // Method 5: Test if we're already authenticated by making a simple API call
-                    console.log('[QueueMonitor] No token found, testing if already authenticated...');
+                    // Method 5: For Genesys Cloud widgets, try to inherit authentication from parent context
+                    console.log('[QueueMonitor] No token found, attempting to use Genesys Cloud widget authentication...');
                     try {
-                        // Try a simple API call to see if we're authenticated
-                        const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
-                        if (testResponse) {
-                            console.log('[QueueMonitor] API call succeeded - already authenticated in Genesys Cloud context');
-                            this.updateConnectionStatus('connected', 'Connected');
-                            return { success: true };
+                        // In widget mode, try to use the implicit authentication from Genesys Cloud
+                        // Set up the client to work with the Genesys Cloud authenticated context
+                        const gcHostOrigin = urlParams.get('gcHostOrigin');
+                        if (gcHostOrigin) {
+                            console.log('[QueueMonitor] Using Genesys Cloud host origin for authentication:', gcHostOrigin);
+                            
+                            // Try to configure the client for widget mode
+                            client.basePath = gcHostOrigin.replace('apps.', 'api.') + '/api/v2';
+                            console.log('[QueueMonitor] Set API base path to:', client.basePath);
+                            
+                            // In widget mode, authentication should be inherited from the parent Genesys Cloud session
+                            // Test with a simple API call
+                            const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                            if (testResponse) {
+                                console.log('[QueueMonitor] ✅ API call succeeded - authenticated via Genesys Cloud widget context');
+                                this.updateConnectionStatus('connected', 'Connected via Genesys Cloud');
+                                return { success: true };
+                            }
                         }
                     } catch (testError) {
-                        console.log('[QueueMonitor] Test API call failed:', testError.message);
+                        console.log('[QueueMonitor] Widget authentication failed:', testError.message);
+                        console.log('[QueueMonitor] This may indicate insufficient permissions or integration configuration issues');
                     }
                     
                     // For interaction widgets, try to use the loginImplicitGrant method
@@ -941,10 +956,10 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 interactionId: urlParams.get('interactionId')
             });
             
-            // Also check for the interpolated interaction ID parameter
-            const interpolatedIid = urlParams.get('iid');
-            if (interpolatedIid) {
-                console.log('[QueueMonitor] Found interpolated interaction ID:', interpolatedIid);
+            // Check for the interpolated conversation ID parameter
+            const interpolatedConversationId = urlParams.get('conversationId');
+            if (interpolatedConversationId) {
+                console.log('[QueueMonitor] Found interpolated conversation ID:', interpolatedConversationId);
             }
             
             if (conversationId) {
