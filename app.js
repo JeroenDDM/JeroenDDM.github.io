@@ -171,6 +171,28 @@ class QueueMonitor {
                 console.log('[QueueMonitor] 1. App is being tested in an iframe but not through Genesys Cloud integration');
                 console.log('[QueueMonitor] 2. URL interpolation is not working (check app.json and integration setup)');
                 console.log('[QueueMonitor] 3. App needs to be accessed through Genesys Cloud Admin integration, not directly');
+                
+                // Try to detect if we're in Genesys Cloud context
+                try {
+                    console.log('[QueueMonitor] === IFRAME CONTEXT ANALYSIS ===');
+                    console.log('[QueueMonitor] Parent window origin:', window.parent?.location?.origin || 'Cannot access');
+                    console.log('[QueueMonitor] Parent window hostname:', window.parent?.location?.hostname || 'Cannot access');
+                    console.log('[QueueMonitor] Current frame URL:', window.location.href);
+                    console.log('[QueueMonitor] Referrer:', document.referrer || 'No referrer');
+                    
+                    // Check if parent looks like Genesys
+                    const parentOrigin = document.referrer;
+                    if (parentOrigin.includes('mypurecloud') || parentOrigin.includes('apps.')) {
+                        console.log('[QueueMonitor] ✅ Parent appears to be Genesys Cloud');
+                        console.log('[QueueMonitor] 🔥 ISSUE: In Genesys Cloud but URL interpolation failed!');
+                        console.log('[QueueMonitor] 🔧 Check integration Application URL and widget configuration');
+                    } else {
+                        console.log('[QueueMonitor] ❌ Parent does not appear to be Genesys Cloud');
+                    }
+                    console.log('[QueueMonitor] === END IFRAME CONTEXT ANALYSIS ===');
+                } catch (e) {
+                    console.log('[QueueMonitor] Cannot analyze iframe context (cross-origin restrictions)');
+                }
             }
 
             // URL Interpolation Parameter Status
