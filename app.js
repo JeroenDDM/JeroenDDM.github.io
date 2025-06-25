@@ -127,6 +127,28 @@ class QueueMonitor {
             // Log detailed information about the current URL and parameters
             console.log('[QueueMonitor] Current URL:', window.location.href);
             console.log('[QueueMonitor] Query parameters:', window.location.search);
+            
+            // Log URL interpolation analysis
+            console.log('[QueueMonitor] === URL INTERPOLATION ANALYSIS ===');
+            console.log('[QueueMonitor] Expected interpolated URL format:');
+            console.log('[QueueMonitor] https://jeroenddm.github.io/index.html?gcHostOrigin={{gcHostOrigin}}&gcTargetEnv={{gcTargetEnv}}&iid={{iid}}&locale={{locale}}&environment={{pcEnvironment}}');
+            console.log('[QueueMonitor] ');
+            console.log('[QueueMonitor] Actual URL received:', window.location.href);
+            console.log('[QueueMonitor] ');
+            if (window.location.search) {
+                console.log('[QueueMonitor] Query string breakdown:');
+                const params = new URLSearchParams(window.location.search);
+                for (const [key, value] of params.entries()) {
+                    console.log(`[QueueMonitor]   ${key} = "${value}"`);
+                }
+            } else {
+                console.log('[QueueMonitor] ❌ NO QUERY PARAMETERS FOUND');
+                console.log('[QueueMonitor] This indicates URL interpolation is not working.');
+                console.log('[QueueMonitor] Expected parameters: gcHostOrigin, gcTargetEnv, iid, locale, environment');
+            }
+            console.log('[QueueMonitor] === END URL INTERPOLATION ANALYSIS ===');
+            console.log('[QueueMonitor] ');
+            
             console.log('[QueueMonitor] URL parameters found:', {
                 gcHostOrigin: urlParams.get('gcHostOrigin'),
                 gcTargetEnv: urlParams.get('gcTargetEnv'),
@@ -150,9 +172,31 @@ class QueueMonitor {
                 console.log('[QueueMonitor] 2. URL interpolation is not working (check app.json and integration setup)');
                 console.log('[QueueMonitor] 3. App needs to be accessed through Genesys Cloud Admin integration, not directly');
             }
+
+            // URL Interpolation Parameter Status
+            console.log('[QueueMonitor] === URL INTERPOLATION PARAMETER STATUS ===');
+            const expectedParams = [
+                { name: 'gcHostOrigin', description: 'Genesys Cloud host origin' },
+                { name: 'gcTargetEnv', description: 'Target environment identifier' },
+                { name: 'iid', description: 'Interaction ID (for transfers)' },
+                { name: 'locale', description: 'User locale setting' },
+                { name: 'environment', description: 'PureCloud environment name' },
+                { name: 'pcEnvironment', description: 'Legacy PureCloud environment' }
+            ];
+            
+            expectedParams.forEach(param => {
+                const value = urlParams.get(param.name);
+                const status = value ? '✅ FOUND' : '❌ MISSING';
+                console.log(`[QueueMonitor] ${param.name}: ${status} ${value ? `"${value}"` : ''} (${param.description})`);
+            });
+            console.log('[QueueMonitor] === END PARAMETER STATUS ===');
             
             if (hasGenesysParams) {
+                console.log('[QueueMonitor] === FINAL DETERMINATION ===');
+                console.log('[QueueMonitor] ✅ WIDGET MODE DETECTED');
                 console.log('[QueueMonitor] Running in Genesys Cloud environment - using implicit grant authentication');
+                console.log('[QueueMonitor] Transfer functionality will be available for active interactions');
+                console.log('[QueueMonitor] =====================================');
                 this.isStandalone = false;
                 
                 // For interaction widgets, we can use implicit grant authentication
@@ -288,7 +332,12 @@ class QueueMonitor {
                 }
                 
             } else {
+                console.log('[QueueMonitor] === FINAL DETERMINATION ===');
+                console.log('[QueueMonitor] ⚠️  STANDALONE MODE DETECTED');
                 console.log('[QueueMonitor] Running in standalone mode - attempting OAuth authentication');
+                console.log('[QueueMonitor] Transfer functionality will NOT be available');
+                console.log('[QueueMonitor] To enable widget mode: Set up Genesys Cloud integration and access through Genesys Cloud');
+                console.log('[QueueMonitor] =====================================');
                 this.isStandalone = true;
                 
                 // Check if we have a valid OAuth client ID configured
