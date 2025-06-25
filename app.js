@@ -374,35 +374,62 @@ class QueueMonitor {
                                 console.log('[QueueMonitor] Attempting to use Client App SDK session...');
                                 
                                 try {
-                                    // Try to get user info through Client App SDK to verify authentication
-                                    await this.clientApp.users.me();
-                                    console.log('[QueueMonitor] Client App SDK session verified');
+                                    // For widgets, we need to check if there are available methods on the Client App SDK
+                                    console.log('[QueueMonitor] Available Client App SDK methods:', Object.keys(this.clientApp));
                                     
-                                    // Now configure the Platform Client to use the same session
-                                    // This should inherit the authentication from the Genesys Cloud session
-                                    console.log('[QueueMonitor] Testing API access with inherited session...');
-                                    const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                                    // Try different approaches to verify authentication
+                                    let authVerified = false;
                                     
-                                    if (testResponse) {
-                                        console.log('[QueueMonitor] ✅ Widget authentication successful with inherited session!');
-                                        this.updateConnectionStatus('connected', 'Connected via Genesys Cloud Widget');
-                                        return { success: true };
+                                    // Method 1: Try alerting (basic Client App SDK method)
+                                    if (typeof this.clientApp.alerting === 'function') {
+                                        console.log('[QueueMonitor] Client App SDK alerting method available');
+                                        authVerified = true;
                                     }
-                                } catch (sessionError) {
-                                    console.log('[QueueMonitor] Client App SDK session error:', sessionError.message);
                                     
-                                    // Fallback: try direct API call anyway
-                                    console.log('[QueueMonitor] Trying direct API access...');
-                                    try {
+                                    // Method 2: Check if we have any methods available
+                                    if (typeof this.clientApp.lifecycle === 'object') {
+                                        console.log('[QueueMonitor] Client App SDK lifecycle available');
+                                        authVerified = true;
+                                    }
+                                    
+                                    if (authVerified) {
+                                        console.log('[QueueMonitor] Client App SDK context verified');
+                                        
+                                        // For Genesys Cloud widgets, the Platform Client should inherit authentication
+                                        // Try a direct API call - it should work in widget context
+                                        console.log('[QueueMonitor] Testing API access in widget context...');
+                                        
+                                        // Configure the client with proper environment but let it inherit auth
+                                        client.basePath = undefined; // Let it use default
+                                        
                                         const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                                        
                                         if (testResponse) {
-                                            console.log('[QueueMonitor] ✅ Direct API access successful!');
-                                            this.updateConnectionStatus('connected', 'Connected via Direct API');
+                                            console.log('[QueueMonitor] ✅ Widget authentication successful!');
+                                            this.updateConnectionStatus('connected', 'Connected via Genesys Cloud Widget');
                                             return { success: true };
                                         }
-                                    } catch (apiError) {
-                                        console.log('[QueueMonitor] Direct API access also failed:', apiError.message);
                                     }
+                                } catch (sessionError) {
+                                    console.log('[QueueMonitor] Client App SDK verification failed:', sessionError.message);
+                                }
+                                
+                                // Final fallback: try with minimal configuration
+                                console.log('[QueueMonitor] Trying minimal widget configuration...');
+                                try {
+                                    // Reset client to minimal config
+                                    client.basePath = undefined;
+                                    client.setEnvironment(regionHost);
+                                    
+                                    // In widget mode, authentication might be handled by the browser context
+                                    const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                                    if (testResponse) {
+                                        console.log('[QueueMonitor] ✅ Minimal widget configuration successful!');
+                                        this.updateConnectionStatus('connected', 'Connected via Widget Context');
+                                        return { success: true };
+                                    }
+                                } catch (minimalError) {
+                                    console.log('[QueueMonitor] Minimal configuration also failed:', minimalError.message);
                                 }
                             }
                         } catch (widgetAuthError) {
