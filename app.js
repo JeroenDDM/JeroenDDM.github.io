@@ -133,7 +133,7 @@ class QueueMonitor {
             // Log URL interpolation analysis
             console.log('[QueueMonitor] === URL INTERPOLATION ANALYSIS ===');
             console.log('[QueueMonitor] Expected interpolated URL format:');
-            console.log('[QueueMonitor] https://jeroenddm.github.io/index.html?gcHostOrigin={{gcHostOrigin}}&gcTargetEnv={{gcTargetEnv}}&conversationId={{conversationId}}&langTag={{langTag}}&environment={{pcEnvironment}}');
+            console.log('[QueueMonitor] https://jeroenddm.github.io/index.html?gcHostOrigin={{gcHostOrigin}}&gcTargetEnv={{gcTargetEnv}}&conversationId={{conversationId}}&langTag={{langTag}}');
             console.log('[QueueMonitor] ');
             console.log('[QueueMonitor] Actual URL received:', window.location.href);
             console.log('[QueueMonitor] ');
@@ -146,7 +146,7 @@ class QueueMonitor {
             } else {
                 console.log('[QueueMonitor] ❌ NO QUERY PARAMETERS FOUND');
                 console.log('[QueueMonitor] This indicates URL interpolation is not working.');
-                console.log('[QueueMonitor] Expected parameters: gcHostOrigin, gcTargetEnv, conversationId, langTag, environment');
+                console.log('[QueueMonitor] Expected parameters: gcHostOrigin, gcTargetEnv, conversationId, langTag');
             }
             console.log('[QueueMonitor] === END URL INTERPOLATION ANALYSIS ===');
             console.log('[QueueMonitor] ');
@@ -203,9 +203,7 @@ class QueueMonitor {
                 { name: 'gcHostOrigin', description: 'Genesys Cloud host origin' },
                 { name: 'gcTargetEnv', description: 'Target environment identifier' },
                 { name: 'conversationId', description: 'Conversation ID (for transfers)' },
-                { name: 'langTag', description: 'Language tag setting' },
-                { name: 'environment', description: 'PureCloud environment name' },
-                { name: 'pcEnvironment', description: 'Legacy PureCloud environment' }
+                { name: 'langTag', description: 'Language tag setting' }
             ];
             
             expectedParams.forEach(param => {
@@ -325,31 +323,91 @@ class QueueMonitor {
                         return { success: true };
                     }
                     
-                    // Method 5: For Genesys Cloud widgets, try to inherit authentication from parent context
-                    console.log('[QueueMonitor] No token found, attempting to use Genesys Cloud widget authentication...');
-                    try {
-                        // In widget mode, try to use the implicit authentication from Genesys Cloud
-                        // Set up the client to work with the Genesys Cloud authenticated context
-                        const gcHostOrigin = urlParams.get('gcHostOrigin');
-                        if (gcHostOrigin) {
-                            console.log('[QueueMonitor] Using Genesys Cloud host origin for authentication:', gcHostOrigin);
+                    // Method 5: For Genesys Cloud widgets, use Client App SDK authentication
+                    console.log('[QueueMonitor] No token found, attempting Client App SDK authentication...');
+                    
+                    if (this.clientApp) {
+                        try {
+                            console.log('[QueueMonitor] Using Client App SDK for widget authentication');
                             
-                            // Try to configure the client for widget mode
-                            client.basePath = gcHostOrigin.replace('apps.', 'api.') + '/api/v2';
-                            console.log('[QueueMonitor] Set API base path to:', client.basePath);
+                            // Configure the environment from the interpolated parameters
+                            const gcHostOrigin = urlParams.get('gcHostOrigin');
+                            const gcTargetEnv = urlParams.get('gcTargetEnv');
                             
-                            // In widget mode, authentication should be inherited from the parent Genesys Cloud session
-                            // Test with a simple API call
-                            const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
-                            if (testResponse) {
-                                console.log('[QueueMonitor] ✅ API call succeeded - authenticated via Genesys Cloud widget context');
-                                this.updateConnectionStatus('connected', 'Connected via Genesys Cloud');
-                                return { success: true };
+                            if (gcHostOrigin && gcTargetEnv) {
+                                console.log('[QueueMonitor] Configuring environment for widget mode');
+                                console.log('[QueueMonitor] Host Origin:', gcHostOrigin);
+                                console.log('[QueueMonitor] Target Environment:', gcTargetEnv);
+                                
+                                // Set the correct environment for the platform client
+                                let environment = 'mypurecloud.ie'; // default
+                                if (gcHostOrigin.includes('mypurecloud.com')) {
+                                    environment = 'mypurecloud.com';
+                                } else if (gcHostOrigin.includes('mypurecloud.com.au')) {
+                                    environment = 'mypurecloud.com.au';
+                                } else if (gcHostOrigin.includes('mypurecloud.jp')) {
+                                    environment = 'mypurecloud.jp';
+                                } else if (gcHostOrigin.includes('mypurecloud.de')) {
+                                    environment = 'mypurecloud.de';
+                                }
+                                
+                                console.log('[QueueMonitor] Detected environment:', environment);
+                                
+                                // Configure platform client environment
+                                let regionHost;
+                                if (environment === 'mypurecloud.ie') {
+                                    regionHost = this.platformClient.PureCloudRegionHosts.eu_west_1;
+                                } else if (environment === 'mypurecloud.com') {
+                                    regionHost = this.platformClient.PureCloudRegionHosts.us_east_1;
+                                } else if (environment === 'mypurecloud.com.au') {
+                                    regionHost = this.platformClient.PureCloudRegionHosts.ap_southeast_2;
+                                } else if (environment === 'mypurecloud.jp') {
+                                    regionHost = this.platformClient.PureCloudRegionHosts.ap_northeast_1;
+                                } else if (environment === 'mypurecloud.de') {
+                                    regionHost = this.platformClient.PureCloudRegionHosts.eu_central_1;
+                                }
+                                
+                                client.setEnvironment(regionHost);
+                                console.log('[QueueMonitor] Platform client environment configured');
+                                
+                                // For widgets, try to use the Client App SDK's session
+                                console.log('[QueueMonitor] Attempting to use Client App SDK session...');
+                                
+                                try {
+                                    // Try to get user info through Client App SDK to verify authentication
+                                    await this.clientApp.users.me();
+                                    console.log('[QueueMonitor] Client App SDK session verified');
+                                    
+                                    // Now configure the Platform Client to use the same session
+                                    // This should inherit the authentication from the Genesys Cloud session
+                                    console.log('[QueueMonitor] Testing API access with inherited session...');
+                                    const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                                    
+                                    if (testResponse) {
+                                        console.log('[QueueMonitor] ✅ Widget authentication successful with inherited session!');
+                                        this.updateConnectionStatus('connected', 'Connected via Genesys Cloud Widget');
+                                        return { success: true };
+                                    }
+                                } catch (sessionError) {
+                                    console.log('[QueueMonitor] Client App SDK session error:', sessionError.message);
+                                    
+                                    // Fallback: try direct API call anyway
+                                    console.log('[QueueMonitor] Trying direct API access...');
+                                    try {
+                                        const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
+                                        if (testResponse) {
+                                            console.log('[QueueMonitor] ✅ Direct API access successful!');
+                                            this.updateConnectionStatus('connected', 'Connected via Direct API');
+                                            return { success: true };
+                                        }
+                                    } catch (apiError) {
+                                        console.log('[QueueMonitor] Direct API access also failed:', apiError.message);
+                                    }
+                                }
                             }
+                        } catch (widgetAuthError) {
+                            console.log('[QueueMonitor] Client App SDK authentication failed:', widgetAuthError.message);
                         }
-                    } catch (testError) {
-                        console.log('[QueueMonitor] Widget authentication failed:', testError.message);
-                        console.log('[QueueMonitor] This may indicate insufficient permissions or integration configuration issues');
                     }
                     
                     // For interaction widgets, try to use the loginImplicitGrant method
