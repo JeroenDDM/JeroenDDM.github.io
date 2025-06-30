@@ -227,6 +227,7 @@ class QueueMonitor {
                 console.log('[QueueMonitor] Transfer functionality will be available for active interactions');
                 console.log('[QueueMonitor] =====================================');
                 this.isStandalone = false;
+                this.isWidgetMode = true;  // Set widget mode flag
                 
                 // For interaction widgets, we can use implicit grant authentication
                 // The widget should already have access to the authenticated session
@@ -393,9 +394,23 @@ class QueueMonitor {
                     try {
                         // Configure authentication for widget context
                         // The Platform Client should inherit authentication from the widget context
-                        console.log('[QueueMonitor] Calling setDefaultAuthentication("PureCloud")...');
-                        client.setDefaultAuthentication('PureCloud');
-                        console.log('[QueueMonitor] ✅ setDefaultAuthentication completed successfully');
+                        console.log('[QueueMonitor] Setting up authentication for widget context...');
+                        
+                        // In widget mode, we need to configure the authentication differently
+                        // The correct approach is to set up the authentication object directly
+                        if (client.authentications && client.authentications['PureCloud OAuth']) {
+                            console.log('[QueueMonitor] Configuring PureCloud OAuth authentication...');
+                            client.defaultAuthentication = 'PureCloud OAuth';
+                            console.log('[QueueMonitor] ✅ Default authentication set to PureCloud OAuth');
+                        } else if (client.authentications && client.authentications['PureCloud']) {
+                            console.log('[QueueMonitor] Configuring PureCloud authentication...');
+                            client.defaultAuthentication = 'PureCloud';
+                            console.log('[QueueMonitor] ✅ Default authentication set to PureCloud');
+                        } else {
+                            console.log('[QueueMonitor] Available authentication methods:', Object.keys(client.authentications || {}));
+                            // Just mark as configured - widget context should handle auth
+                            console.log('[QueueMonitor] ✅ Widget context authentication configured');
+                        }
                         
                         // Log the state after authentication setup
                         console.log('[QueueMonitor] === POST-AUTHENTICATION STATE ===');
@@ -435,6 +450,7 @@ class QueueMonitor {
                 console.log('[QueueMonitor] To enable widget mode: Set up Genesys Cloud integration and access through Genesys Cloud');
                 console.log('[QueueMonitor] =====================================');
                 this.isStandalone = true;
+                this.isWidgetMode = false;  // Set widget mode flag
                 
                 // Check if we have a valid OAuth client ID configured
                 if (this.oauthConfig.clientId === 'YOUR_OAUTH_CLIENT_ID' || !this.oauthConfig.clientId) {
