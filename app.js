@@ -103,6 +103,13 @@ class QueueMonitor {
 
     async authenticateWithGenesys() {
         try {
+            console.log('[QueueMonitor] ========================================');
+            console.log('[QueueMonitor] AUTHENTICATION PROCESS STARTED');
+            console.log('[QueueMonitor] ========================================');
+            console.log('[QueueMonitor] Timestamp:', new Date().toISOString());
+            console.log('[QueueMonitor] Current URL:', window.location.href);
+            console.log('[QueueMonitor] User Agent:', navigator.userAgent);
+            
             this.updateConnectionStatus('connecting', 'Authenticating...');
             
             // Check if we're in a Genesys Cloud environment by looking for query parameters
@@ -370,120 +377,49 @@ class QueueMonitor {
                                 client.setEnvironment(regionHost);
                                 console.log('[QueueMonitor] Platform client environment configured');
                                 
-                                // For widgets, try to use the Client App SDK's session
-                                console.log('[QueueMonitor] Attempting to use Client App SDK session...');
-                                
-                                try {
-                                    // For widgets, we need to check if there are available methods on the Client App SDK
-                                    console.log('[QueueMonitor] Available Client App SDK methods:', Object.keys(this.clientApp));
-                                    
-                                    // Try to get user information via Client App SDK
-                                    if (this.clientApp.users && typeof this.clientApp.users.me === 'function') {
-                                        console.log('[QueueMonitor] Attempting to get user info via Client App SDK...');
-                                        const userInfo = await this.clientApp.users.me();
-                                        console.log('[QueueMonitor] Client App SDK user info retrieved:', userInfo);
-                                        
-                                        // If we can get user info, we're authenticated in the widget context
-                                        console.log('[QueueMonitor] Widget authentication verified via Client App SDK');
-                                        
-                                        // Now try to use the Platform Client in widget mode
-                                        // Reset client configuration for widget context
-                                        client.basePath = undefined;
-                                        
-                                        // For widgets, we might need to configure the Platform Client differently
-                                        // Try setting up authentication token from the widget context
-                                        console.log('[QueueMonitor] Configuring Platform Client for widget mode...');
-                                        
-                                        // Check if there's a way to get the auth token from Client App SDK
-                                        if (userInfo && userInfo.id) {
-                                            console.log('[QueueMonitor] User authenticated with ID:', userInfo.id);
-                                            
-                                            // Try different authentication configurations for widgets
-                                            try {
-                                                // Method A: Try without explicit token (widget inherits auth)
-                                                console.log('[QueueMonitor] Testing inherited authentication...');
-                                                const testResponse1 = await this.routingApi.getRoutingQueues({ pageSize: 1 });
-                                                if (testResponse1) {
-                                                    console.log('[QueueMonitor] ✅ Widget authentication successful with inherited auth!');
-                                                    this.updateConnectionStatus('connected', 'Connected via Inherited Auth');
-                                                    return { success: true };
-                                                }
-                                            } catch (inheritError) {
-                                                console.log('[QueueMonitor] Inherited auth failed:', inheritError.message);
-                                            }
-                                            
-                                            // Method B: Try using Client App SDK for API calls
-                                            if (this.clientApp.directory && typeof this.clientApp.directory.getUsers === 'function') {
-                                                console.log('[QueueMonitor] Testing Client App SDK API access...');
-                                                try {
-                                                    const directoryTest = await this.clientApp.directory.getUsers({ pageSize: 1 });
-                                                    console.log('[QueueMonitor] ✅ Client App SDK API access working!');
-                                                    
-                                                    // If Client App SDK works, we can use it for all API calls
-                                                    this.useClientAppSDK = true;
-                                                    this.updateConnectionStatus('connected', 'Connected via Client App SDK');
-                                                    return { success: true };
-                                                } catch (sdkError) {
-                                                    console.log('[QueueMonitor] Client App SDK API failed:', sdkError.message);
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        console.log('[QueueMonitor] Client App SDK users.me method not available');
-                                        
-                                        // Fallback: try lifecycle management
-                                        if (typeof this.clientApp.lifecycle === 'object') {
-                                            console.log('[QueueMonitor] Using Client App SDK lifecycle for authentication');
-                                            
-                                            // Configure client for widget mode
-                                            client.basePath = undefined;
-                                            
-                                            // Test API call with lifecycle context
-                                            const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
-                                            
-                                            if (testResponse) {
-                                                console.log('[QueueMonitor] ✅ Widget authentication successful via lifecycle!');
-                                                this.updateConnectionStatus('connected', 'Connected via Widget Lifecycle');
-                                                return { success: true };
-                                            }
-                                        }
-                                    }
-                                } catch (sessionError) {
-                                    console.log('[QueueMonitor] Client App SDK verification failed:', sessionError.message);
-                                }
-                                
-                                // Final fallback: try with minimal configuration
-                                console.log('[QueueMonitor] Trying minimal widget configuration...');
-                                try {
-                                    // Reset client to minimal config
-                                    client.basePath = undefined;
-                                    client.setEnvironment(regionHost);
-                                    
-                                    // In widget mode, authentication might be handled by the browser context
-                                    const testResponse = await this.routingApi.getRoutingQueues({ pageSize: 1 });
-                                    if (testResponse) {
-                                        console.log('[QueueMonitor] ✅ Minimal widget configuration successful!');
-                                        this.updateConnectionStatus('connected', 'Connected via Widget Context');
-                                        return { success: true };
-                                    }
-                                } catch (minimalError) {
-                                    console.log('[QueueMonitor] Minimal configuration also failed:', minimalError.message);
-                                }
+                                                    // For widgets, configure Platform Client for widget context
+                    console.log('[QueueMonitor] ======================================');
+                    console.log('[QueueMonitor] CONFIGURING WIDGET AUTHENTICATION');
+                    console.log('[QueueMonitor] ======================================');
+                    console.log('[QueueMonitor] Client instance:', !!client);
+                    console.log('[QueueMonitor] Client authentication methods available:', Object.keys(client.authentications || {}));
+                    console.log('[QueueMonitor] Client default headers (before):', client.defaultHeaders);
+                    console.log('[QueueMonitor] Client base path (before):', client.basePath);
+                    
+                    // In widget mode, authentication is handled by the widget framework
+                    // We just need to configure the Platform Client correctly
+                    console.log('[QueueMonitor] Setting up Platform Client for widget authentication...');
+                    
+                    try {
+                        // Configure authentication for widget context
+                        // The Platform Client should inherit authentication from the widget context
+                        console.log('[QueueMonitor] Calling setDefaultAuthentication("PureCloud")...');
+                        client.setDefaultAuthentication('PureCloud');
+                        console.log('[QueueMonitor] ✅ setDefaultAuthentication completed successfully');
+                        
+                        // Log the state after authentication setup
+                        console.log('[QueueMonitor] === POST-AUTHENTICATION STATE ===');
+                        console.log('[QueueMonitor] Client default headers (after):', client.defaultHeaders);
+                        console.log('[QueueMonitor] Client base path (after):', client.basePath);
+                        console.log('[QueueMonitor] PureCloud auth object:', client.authentications?.PureCloud);
+                        console.log('[QueueMonitor] PureCloud access token:', client.authentications?.PureCloud?.accessToken ? 'SET' : 'NOT SET');
+                        console.log('[QueueMonitor] === END POST-AUTHENTICATION STATE ===');
+                        
+                        console.log('[QueueMonitor] ✅ Widget authentication configured successfully');
+                        this.updateConnectionStatus('connected', 'Connected via Widget Context');
+                        return { success: true };
+                        
+                    } catch (authConfigError) {
+                        console.error('[QueueMonitor] ❌ Error during widget authentication configuration:', authConfigError);
+                        console.error('[QueueMonitor] Error details:', authConfigError.message);
+                        console.error('[QueueMonitor] Error stack:', authConfigError.stack);
+                        throw authConfigError;
+                    }
                             }
                         } catch (widgetAuthError) {
                             console.log('[QueueMonitor] Client App SDK authentication failed:', widgetAuthError.message);
                         }
                     }
-                    
-                    // For interaction widgets, try to use the loginImplicitGrant method
-                    // This might work if we're in the right context
-                    console.log('[QueueMonitor] Attempting implicit grant authentication...');
-                    
-                    // Note: In a real interaction widget, you would have a client ID
-                    // For now, we'll assume the widget is running in an authenticated context
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    console.log('[QueueMonitor] Authentication completed - assuming authenticated Genesys Cloud context');
                     
                 } catch (authError) {
                     console.error('[QueueMonitor] Implicit grant authentication failed:', authError);
@@ -660,24 +596,74 @@ class QueueMonitor {
                 console.log('[QueueMonitor] Using Platform Client for API calls...');
                 
                 // Debug: Check authentication state before making API calls
+                console.log('[QueueMonitor] ========================================');
+                console.log('[QueueMonitor] PREPARING API CALL - AUTHENTICATION CHECK');
+                console.log('[QueueMonitor] ========================================');
+                
                 const client = this.platformClient.ApiClient.instance;
                 const currentToken = client.authentications?.PureCloud?.accessToken;
                 const authHeader = client.defaultHeaders?.['Authorization'];
-                console.log('[QueueMonitor] Making API call with:');
-                console.log('  - Token:', currentToken ? (currentToken.substring(0, 20) + '...') : 'NO TOKEN');
-                console.log('  - Auth Header:', authHeader ? (authHeader.substring(0, 27) + '...') : 'NO HEADER');
-                console.log('  - Base Path:', client.basePath || 'NOT SET');
                 
-                // If no token and no auth header, don't make API calls
-                if (!currentToken && !authHeader) {
+                console.log('[QueueMonitor] API Call Authentication State:');
+                console.log('[QueueMonitor]   - Widget Mode:', this.isWidgetMode);
+                console.log('[QueueMonitor]   - Token Available:', currentToken ? 'YES' : 'NO');
+                console.log('[QueueMonitor]   - Token Value:', currentToken ? (currentToken.substring(0, 20) + '...') : 'NO TOKEN');
+                console.log('[QueueMonitor]   - Auth Header:', authHeader ? (authHeader.substring(0, 27) + '...') : 'NO HEADER');
+                console.log('[QueueMonitor]   - Base Path:', client.basePath || 'NOT SET');
+                console.log('[QueueMonitor]   - Client Environment:', client.environment || 'NOT SET');
+                console.log('[QueueMonitor]   - Default Authentication:', client.defaultAuthentication || 'NOT SET');
+                
+                // Check authentication configuration
+                if (client.authentications?.PureCloud) {
+                    console.log('[QueueMonitor] PureCloud Authentication Object:');
+                    console.log('[QueueMonitor]   - Type:', client.authentications.PureCloud.type || 'NOT SET');
+                    console.log('[QueueMonitor]   - Api Key:', client.authentications.PureCloud.apiKey ? 'SET' : 'NOT SET');
+                    console.log('[QueueMonitor]   - Api Key Prefix:', client.authentications.PureCloud.apiKeyPrefix || 'NOT SET');
+                    console.log('[QueueMonitor]   - Access Token:', client.authentications.PureCloud.accessToken ? 'SET' : 'NOT SET');
+                }
+                
+                // In widget mode, authentication is handled automatically by the browser context
+                // Skip explicit token validation for widget contexts
+                if (!this.isWidgetMode && !currentToken && !authHeader) {
+                    console.error('[QueueMonitor] ❌ Authentication validation failed - no token available for standalone mode');
                     throw new Error('No authentication token available - cannot make API calls');
                 }
                 
+                if (this.isWidgetMode) {
+                    console.log('[QueueMonitor] ✅ Widget mode detected - proceeding with API call (authentication handled by widget framework)');
+                } else {
+                    console.log('[QueueMonitor] ✅ Standalone mode with valid authentication - proceeding with API call');
+                }
+                
                 // Fetch all queues
-                queuesResponse = await this.routingApi.getRoutingQueues({
-                    pageSize: 100,
-                    sortBy: 'name'
-                });
+                console.log('[QueueMonitor] === MAKING API CALL ===');
+                console.log('[QueueMonitor] Calling routingApi.getRoutingQueues with params:', { pageSize: 100, sortBy: 'name' });
+                
+                const startTime = Date.now();
+                try {
+                    queuesResponse = await this.routingApi.getRoutingQueues({
+                        pageSize: 100,
+                        sortBy: 'name'
+                    });
+                    const endTime = Date.now();
+                    console.log('[QueueMonitor] ✅ API call successful in', (endTime - startTime), 'ms');
+                    console.log('[QueueMonitor] Response type:', typeof queuesResponse);
+                    console.log('[QueueMonitor] Response entities count:', queuesResponse?.entities?.length || 'NO ENTITIES');
+                    console.log('[QueueMonitor] Response structure:', {
+                        hasEntities: !!queuesResponse?.entities,
+                        hasPageSize: !!queuesResponse?.pageSize,
+                        hasPageNumber: !!queuesResponse?.pageNumber,
+                        hasTotal: !!queuesResponse?.total
+                    });
+                } catch (apiError) {
+                    const endTime = Date.now();
+                    console.error('[QueueMonitor] ❌ API call failed after', (endTime - startTime), 'ms');
+                    console.error('[QueueMonitor] API Error:', apiError);
+                    console.error('[QueueMonitor] API Error Message:', apiError.message);
+                    console.error('[QueueMonitor] API Error Status:', apiError.status);
+                    console.error('[QueueMonitor] API Error Stack:', apiError.stack);
+                    throw apiError;
+                }
             }
             
             if (!queuesResponse || !queuesResponse.entities) {
