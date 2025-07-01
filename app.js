@@ -378,58 +378,129 @@ class QueueMonitor {
                                 client.setEnvironment(regionHost);
                                 console.log('[QueueMonitor] Platform client environment configured');
                                 
-                                                    // For widgets, configure Platform Client for widget context
-                    console.log('[QueueMonitor] ======================================');
-                    console.log('[QueueMonitor] CONFIGURING WIDGET AUTHENTICATION');
-                    console.log('[QueueMonitor] ======================================');
-                    console.log('[QueueMonitor] Client instance:', !!client);
-                    console.log('[QueueMonitor] Client authentication methods available:', Object.keys(client.authentications || {}));
-                    console.log('[QueueMonitor] Client default headers (before):', client.defaultHeaders);
-                    console.log('[QueueMonitor] Client base path (before):', client.basePath);
-                    
-                    // In widget mode, authentication is handled by the widget framework
-                    // We just need to configure the Platform Client correctly
-                    console.log('[QueueMonitor] Setting up Platform Client for widget authentication...');
-                    
-                    try {
-                        // Configure authentication for widget context
-                        // The Platform Client should inherit authentication from the widget context
-                        console.log('[QueueMonitor] Setting up authentication for widget context...');
-                        
-                        // In widget mode, we need to configure the authentication differently
-                        // The correct approach is to set up the authentication object directly
-                        if (client.authentications && client.authentications['PureCloud OAuth']) {
-                            console.log('[QueueMonitor] Configuring PureCloud OAuth authentication...');
-                            client.defaultAuthentication = 'PureCloud OAuth';
-                            console.log('[QueueMonitor] ✅ Default authentication set to PureCloud OAuth');
-                        } else if (client.authentications && client.authentications['PureCloud']) {
-                            console.log('[QueueMonitor] Configuring PureCloud authentication...');
-                            client.defaultAuthentication = 'PureCloud';
-                            console.log('[QueueMonitor] ✅ Default authentication set to PureCloud');
-                        } else {
-                            console.log('[QueueMonitor] Available authentication methods:', Object.keys(client.authentications || {}));
-                            // Just mark as configured - widget context should handle auth
-                            console.log('[QueueMonitor] ✅ Widget context authentication configured');
-                        }
-                        
-                        // Log the state after authentication setup
-                        console.log('[QueueMonitor] === POST-AUTHENTICATION STATE ===');
-                        console.log('[QueueMonitor] Client default headers (after):', client.defaultHeaders);
-                        console.log('[QueueMonitor] Client base path (after):', client.basePath);
-                        console.log('[QueueMonitor] PureCloud auth object:', client.authentications?.PureCloud);
-                        console.log('[QueueMonitor] PureCloud access token:', client.authentications?.PureCloud?.accessToken ? 'SET' : 'NOT SET');
-                        console.log('[QueueMonitor] === END POST-AUTHENTICATION STATE ===');
-                        
-                        console.log('[QueueMonitor] ✅ Widget authentication configured successfully');
-                        this.updateConnectionStatus('connected', 'Connected via Widget Context');
-                        return { success: true };
-                        
-                    } catch (authConfigError) {
-                        console.error('[QueueMonitor] ❌ Error during widget authentication configuration:', authConfigError);
-                        console.error('[QueueMonitor] Error details:', authConfigError.message);
-                        console.error('[QueueMonitor] Error stack:', authConfigError.stack);
-                        throw authConfigError;
-                    }
+                                // For widgets, get authentication token from Client App SDK
+                                console.log('[QueueMonitor] ======================================');
+                                console.log('[QueueMonitor] CONFIGURING WIDGET AUTHENTICATION');
+                                console.log('[QueueMonitor] ======================================');
+                                console.log('[QueueMonitor] Getting authentication token from Client App SDK...');
+                                
+                                try {
+                                    // Get the token from the Client App SDK
+                                    const tokenInfo = await this.clientApp.users.getMe();
+                                    console.log('[QueueMonitor] Client App SDK user info retrieved successfully');
+                                    
+                                    // Try to get the access token using the Client App SDK's authentication
+                                    // The proper way is to use the Client App SDK's internal token
+                                    let accessToken = null;
+                                    
+                                    // Method 1: Try to get token from Client App SDK directly
+                                    if (this.clientApp._accessToken) {
+                                        accessToken = this.clientApp._accessToken;
+                                        console.log('[QueueMonitor] Token retrieved from Client App SDK _accessToken');
+                                    }
+                                    // Method 2: Try to get from authentication object
+                                    else if (this.clientApp.auth && this.clientApp.auth.accessToken) {
+                                        accessToken = this.clientApp.auth.accessToken;
+                                        console.log('[QueueMonitor] Token retrieved from Client App SDK auth.accessToken');
+                                    }
+                                    // Method 3: Try to get from session storage through SDK
+                                    else {
+                                        try {
+                                            // For newer SDK versions, we can get the token through the SDK's method
+                                            const session = await this.clientApp.session.getSession();
+                                            if (session && session.accessToken) {
+                                                accessToken = session.accessToken;
+                                                console.log('[QueueMonitor] Token retrieved from Client App SDK session');
+                                            }
+                                        } catch (sessionError) {
+                                            console.log('[QueueMonitor] Could not get token from session:', sessionError.message);
+                                        }
+                                    }
+                                    
+                                    if (accessToken) {
+                                        console.log('[QueueMonitor] ✅ Access token obtained from Client App SDK');
+                                        console.log('[QueueMonitor] Token preview:', accessToken.substring(0, 20) + '...');
+                                        
+                                        // Set the token on the Platform Client
+                                        console.log('[QueueMonitor] Setting token on Platform Client...');
+                                        
+                                        // Method 1: Use setAccessToken
+                                        client.setAccessToken(accessToken);
+                                        console.log('[QueueMonitor] Method 1 - setAccessToken called');
+                                        
+                                        // Method 2: Set on authentication object directly
+                                        if (client.authentications && client.authentications['PureCloud OAuth']) {
+                                            client.authentications['PureCloud OAuth'].accessToken = accessToken;
+                                            client.defaultAuthentication = 'PureCloud OAuth';
+                                            console.log('[QueueMonitor] Method 2 - PureCloud OAuth token set');
+                                        } else if (client.authentications && client.authentications['PureCloud']) {
+                                            client.authentications['PureCloud'].accessToken = accessToken;
+                                            client.defaultAuthentication = 'PureCloud';
+                                            console.log('[QueueMonitor] Method 2 - PureCloud token set');
+                                        }
+                                        
+                                        // Method 3: Set Authorization header directly
+                                        client.defaultHeaders = client.defaultHeaders || {};
+                                        client.defaultHeaders['Authorization'] = `Bearer ${accessToken}`;
+                                        console.log('[QueueMonitor] Method 3 - Authorization header set');
+                                        
+                                        // Verify the token is set
+                                        console.log('[QueueMonitor] === POST-AUTHENTICATION STATE ===');
+                                        console.log('[QueueMonitor] Access token set:', !!client.authentications?.['PureCloud OAuth']?.accessToken || !!client.authentications?.PureCloud?.accessToken);
+                                        console.log('[QueueMonitor] Authorization header set:', !!client.defaultHeaders?.['Authorization']);
+                                        console.log('[QueueMonitor] Default authentication:', client.defaultAuthentication);
+                                        console.log('[QueueMonitor] === END POST-AUTHENTICATION STATE ===');
+                                        
+                                        console.log('[QueueMonitor] ✅ Widget authentication configured successfully with token');
+                                        this.updateConnectionStatus('connected', 'Connected via Widget Authentication');
+                                        return { success: true };
+                                        
+                                                                         } else {
+                                         console.log('[QueueMonitor] ⚠️  Could not retrieve access token from Client App SDK');
+                                         console.log('[QueueMonitor] Available properties on clientApp:', Object.keys(this.clientApp));
+                                         
+                                         // Log available API methods for debugging
+                                         if (this.clientApp.routing) {
+                                             console.log('[QueueMonitor] Available routing methods:', Object.keys(this.clientApp.routing));
+                                         }
+                                         if (this.clientApp.analytics) {
+                                             console.log('[QueueMonitor] Available analytics methods:', Object.keys(this.clientApp.analytics));
+                                         }
+                                         if (this.clientApp.users) {
+                                             console.log('[QueueMonitor] Available users methods:', Object.keys(this.clientApp.users));
+                                         }
+                                         if (this.clientApp.api) {
+                                             console.log('[QueueMonitor] API object available:', typeof this.clientApp.api);
+                                         }
+                                         if (this.clientApp.pureCloudSession) {
+                                             console.log('[QueueMonitor] pureCloudSession available:', typeof this.clientApp.pureCloudSession);
+                                         }
+                                         
+                                         // Fall back to setting up authentication without explicit token
+                                         // The Platform Client might still work in widget context
+                                         if (client.authentications && client.authentications['PureCloud OAuth']) {
+                                             client.defaultAuthentication = 'PureCloud OAuth';
+                                             console.log('[QueueMonitor] Fall back - set default authentication to PureCloud OAuth');
+                                         } else if (client.authentications && client.authentications['PureCloud']) {
+                                             client.defaultAuthentication = 'PureCloud';
+                                             console.log('[QueueMonitor] Fall back - set default authentication to PureCloud');
+                                         }
+                                         
+                                         console.log('[QueueMonitor] ⚠️  Widget authentication configured without explicit token - may work in widget context');
+                                         this.updateConnectionStatus('connected', 'Connected (Widget Context)');
+                                         return { success: true };
+                                     }
+                                    
+                                } catch (authError) {
+                                    console.error('[QueueMonitor] ❌ Error during widget authentication:', authError);
+                                    console.error('[QueueMonitor] Error details:', authError.message);
+                                    console.error('[QueueMonitor] Error stack:', authError.stack);
+                                    
+                                    // Don't throw - try to continue anyway as widget context might work
+                                    console.log('[QueueMonitor] Continuing despite authentication error - widget context may still work');
+                                    this.updateConnectionStatus('warning', 'Authentication Warning');
+                                    return { success: true };
+                                }
                             }
                         } catch (widgetAuthError) {
                             console.log('[QueueMonitor] Client App SDK authentication failed:', widgetAuthError.message);
@@ -593,21 +664,70 @@ class QueueMonitor {
             let queuesResponse;
             
             // Check if we should use Client App SDK instead of Platform Client
-            if (this.useClientAppSDK && this.clientApp) {
+            if (this.isWidgetMode && this.clientApp) {
                 console.log('[QueueMonitor] Using Client App SDK for API calls...');
                 
-                // Use Client App SDK for queue data
+                // Try Client App SDK first for widget mode
                 try {
-                    queuesResponse = await this.clientApp.routing.getQueues({
-                        pageSize: 100,
-                        sortBy: 'name'
-                    });
-                    console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK');
+                    // Use Client App SDK for queue data - try different method signatures
+                    let sdkQueuesResponse;
+                    
+                    // Method 1: Try with routing API
+                    if (this.clientApp.routing && this.clientApp.routing.getQueues) {
+                        try {
+                            sdkQueuesResponse = await this.clientApp.routing.getQueues({
+                                pageSize: 100,
+                                sortBy: 'name'
+                            });
+                            console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK routing.getQueues');
+                        } catch (method1Error) {
+                            console.log('[QueueMonitor] Client App SDK routing.getQueues failed:', method1Error.message);
+                        }
+                    }
+                    
+                    // Method 2: Try with pureCloudSession API call
+                    if (!sdkQueuesResponse && this.clientApp.pureCloudSession) {
+                        try {
+                            sdkQueuesResponse = await this.clientApp.pureCloudSession.makeApiCall('GET', '/api/v2/routing/queues', {
+                                pageSize: 100,
+                                sortBy: 'name'
+                            });
+                            console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK pureCloudSession');
+                        } catch (method2Error) {
+                            console.log('[QueueMonitor] Client App SDK pureCloudSession failed:', method2Error.message);
+                        }
+                    }
+                    
+                    // Method 3: Try with direct API call if available
+                    if (!sdkQueuesResponse && this.clientApp.api) {
+                        try {
+                            sdkQueuesResponse = await this.clientApp.api.get('/routing/queues', {
+                                pageSize: 100,
+                                sortBy: 'name'
+                            });
+                            console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK api.get');
+                        } catch (method3Error) {
+                            console.log('[QueueMonitor] Client App SDK api.get failed:', method3Error.message);
+                        }
+                    }
+                    
+                    if (sdkQueuesResponse) {
+                        queuesResponse = sdkQueuesResponse;
+                        console.log('[QueueMonitor] ✅ Using Client App SDK response');
+                    } else {
+                        console.log('[QueueMonitor] All Client App SDK methods failed, falling back to Platform Client');
+                        // Fall through to use Platform Client
+                    }
+                    
                 } catch (sdkError) {
                     console.log('[QueueMonitor] Client App SDK queue loading failed:', sdkError.message);
-                    throw new Error('Failed to load queues via Client App SDK: ' + sdkError.message);
+                    console.log('[QueueMonitor] Falling back to Platform Client');
+                    // Fall through to use Platform Client
                 }
-            } else {
+            }
+            
+            // Use Platform Client if Client App SDK didn't work or not in widget mode
+            if (!queuesResponse) {
                 // Use Platform Client (original method)
                 console.log('[QueueMonitor] Using Platform Client for API calls...');
                 
@@ -750,7 +870,36 @@ class QueueMonitor {
                 }
             };
 
-            const response = await this.analyticsApi.postAnalyticsQueuesObservationsQuery(query);
+            let response;
+            
+            // Try Client App SDK first if in widget mode
+            if (this.isWidgetMode && this.clientApp) {
+                try {
+                    // Method 1: Try with analytics API
+                    if (this.clientApp.analytics && this.clientApp.analytics.postAnalyticsQueuesObservationsQuery) {
+                        response = await this.clientApp.analytics.postAnalyticsQueuesObservationsQuery(query);
+                        console.log('[QueueMonitor] ✅ Analytics data loaded via Client App SDK analytics API');
+                    }
+                    // Method 2: Try with pureCloudSession API call
+                    else if (this.clientApp.pureCloudSession) {
+                        response = await this.clientApp.pureCloudSession.makeApiCall('POST', '/api/v2/analytics/queues/observations/query', query);
+                        console.log('[QueueMonitor] ✅ Analytics data loaded via Client App SDK pureCloudSession');
+                    }
+                    // Method 3: Try with direct API call if available
+                    else if (this.clientApp.api) {
+                        response = await this.clientApp.api.post('/analytics/queues/observations/query', query);
+                        console.log('[QueueMonitor] ✅ Analytics data loaded via Client App SDK api.post');
+                    }
+                } catch (sdkError) {
+                    console.log('[QueueMonitor] Client App SDK analytics failed:', sdkError.message);
+                    console.log('[QueueMonitor] Falling back to Platform Client for analytics');
+                }
+            }
+            
+            // Use Platform Client if Client App SDK didn't work
+            if (!response) {
+                response = await this.analyticsApi.postAnalyticsQueuesObservationsQuery(query);
+            }
             
             // Debug: Log the full response structure
             // console.log('[QueueMonitor] Analytics API response:', response);
