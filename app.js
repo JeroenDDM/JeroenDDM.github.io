@@ -1613,7 +1613,7 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.id);
             console.log('[QueueMonitor] Transfer body:', transferBody);
             
-            const result = await this.conversationsApi.postConversationsCallParticipantReplaceQueue(
+            const result = await this.conversationsApi.postConversationParticipantReplaceQueue(
                 this.currentConversationId,
                 callerParticipant.id,
                 transferBody
