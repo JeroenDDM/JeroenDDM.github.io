@@ -1579,12 +1579,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             
             // Execute the blind transfer using Conversations API
             // For blind transfers to queue, use postConversationsCallParticipantReplaceQueue
-            // We need to get the participant ID first
+            // We need to get the caller's participant ID (not the agent's)
             const conversationDetails = await this.conversationsApi.getConversationsCall(this.currentConversationId);
-            const agentParticipant = conversationDetails.participants.find(p => p.purpose === 'agent' && p.state === 'connected');
+            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'external' && p.state === 'connected');
             
-            if (!agentParticipant) {
-                throw new Error('Could not find connected agent participant');
+            if (!callerParticipant) {
+                throw new Error('Could not find connected caller participant');
             }
             
             const transferBody = {
@@ -1593,12 +1593,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 queueName: this.selectedQueue.name
             };
             
-            console.log('[QueueMonitor] Using participant ID:', agentParticipant.id);
+            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.id);
             console.log('[QueueMonitor] Transfer body:', transferBody);
             
             const result = await this.conversationsApi.postConversationsCallParticipantReplaceQueue(
                 this.currentConversationId,
-                agentParticipant.id,
+                callerParticipant.id,
                 transferBody
             );
             
@@ -1643,12 +1643,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             
             // Execute the consult transfer using Conversations API
             // For consult transfers to queue, use postConversationsCallParticipantConsultQueue
-            // We need to get the participant ID first
+            // We need to get the caller's participant ID (not the agent's)
             const conversationDetails = await this.conversationsApi.getConversationsCall(this.currentConversationId);
-            const agentParticipant = conversationDetails.participants.find(p => p.purpose === 'agent' && p.state === 'connected');
+            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'external' && p.state === 'connected');
             
-            if (!agentParticipant) {
-                throw new Error('Could not find connected agent participant');
+            if (!callerParticipant) {
+                throw new Error('Could not find connected caller participant');
             }
             
             const consultBody = {
@@ -1657,12 +1657,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 queueName: this.selectedQueue.name
             };
             
-            console.log('[QueueMonitor] Using participant ID:', agentParticipant.id);
+            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.id);
             console.log('[QueueMonitor] Consult body:', consultBody);
             
             const result = await this.conversationsApi.postConversationsCallParticipantConsultQueue(
                 this.currentConversationId,
-                agentParticipant.id,
+                callerParticipant.id,
                 consultBody
             );
             
