@@ -116,9 +116,90 @@ class QueueMonitor {
             this.updateConnectionStatus('connecting', 'Authenticating...');
             
             // CRITICAL: Check for preserved widget context after OAuth redirect
-            this.checkForPreservedWidgetContext();
+            const widgetContextRestored = this.checkForPreservedWidgetContext();
             
-            // Check if we're in a Genesys Cloud environment by looking for query parameters
+            // If widget context was restored, skip normal URL parameter parsing
+            if (widgetContextRestored) {
+                console.log('[QueueMonitor] 🔄 Widget context was restored - skipping normal URL parameter analysis');
+                console.log('[QueueMonitor] Using restored widget parameters:', this.urlParams);
+                console.log('[QueueMonitor] Widget mode:', this.isWidgetMode);
+                console.log('[QueueMonitor] Conversation ID:', this.urlParams.conversationId);
+                
+                // Continue with widget authentication using restored context
+                const client = this.platformClient.ApiClient.instance;
+                
+                console.log('[QueueMonitor] ======================================');
+                console.log('[QueueMonitor] CONFIGURING RESTORED WIDGET AUTHENTICATION');
+                console.log('[QueueMonitor] ======================================');
+                console.log('[QueueMonitor] Using Platform Client SDK for restored widget authentication...');
+                
+                // Configure environment from restored parameters
+                if (this.urlParams.gcHostOrigin && this.urlParams.gcTargetEnv) {
+                    console.log('[QueueMonitor] Configuring environment for restored widget mode');
+                    console.log('[QueueMonitor] Host Origin:', this.urlParams.gcHostOrigin);
+                    console.log('[QueueMonitor] Target Environment:', this.urlParams.gcTargetEnv);
+                    
+                    let environment = 'mypurecloud.ie';
+                    if (this.urlParams.gcHostOrigin.includes('mypurecloud.com')) {
+                        environment = 'mypurecloud.com';
+                    } else if (this.urlParams.gcHostOrigin.includes('mypurecloud.com.au')) {
+                        environment = 'mypurecloud.com.au';
+                    } else if (this.urlParams.gcHostOrigin.includes('mypurecloud.jp')) {
+                        environment = 'mypurecloud.jp';
+                    } else if (this.urlParams.gcHostOrigin.includes('mypurecloud.de')) {
+                        environment = 'mypurecloud.de';
+                    }
+                    
+                    console.log('[QueueMonitor] Detected environment:', environment);
+                    
+                    let regionHost;
+                    if (environment === 'mypurecloud.ie') {
+                        regionHost = this.platformClient.PureCloudRegionHosts.eu_west_1;
+                    } else if (environment === 'mypurecloud.com') {
+                        regionHost = this.platformClient.PureCloudRegionHosts.us_east_1;
+                    } else if (environment === 'mypurecloud.com.au') {
+                        regionHost = this.platformClient.PureCloudRegionHosts.ap_southeast_2;
+                    } else if (environment === 'mypurecloud.jp') {
+                        regionHost = this.platformClient.PureCloudRegionHosts.ap_northeast_1;
+                    } else if (environment === 'mypurecloud.de') {
+                        regionHost = this.platformClient.PureCloudRegionHosts.eu_central_1;
+                    }
+                    
+                    client.setEnvironment(regionHost);
+                    console.log('[QueueMonitor] Platform client environment configured for restored widget');
+                }
+                
+                // Handle OAuth token from URL hash
+                const hash = window.location.hash;
+                if (hash && hash.includes('access_token')) {
+                    const hashParams = new URLSearchParams(hash.substring(1));
+                    const accessToken = hashParams.get('access_token');
+                    
+                    if (accessToken) {
+                        console.log('[QueueMonitor] ✅ Using OAuth token with restored widget context');
+                        
+                        client.setAccessToken(accessToken);
+                        if (client.authentications && client.authentications.PureCloud) {
+                            client.authentications.PureCloud.accessToken = accessToken;
+                        }
+                        client.defaultHeaders = client.defaultHeaders || {};
+                        client.defaultHeaders['Authorization'] = `Bearer ${accessToken}`;
+                        
+                        // Clean up the URL hash but preserve widget mode
+                        window.history.replaceState(null, null, window.location.pathname + window.location.search);
+                        
+                        this.updateConnectionStatus('connected', 'Connected via Restored Widget Context + OAuth');
+                        return { success: true };
+                    }
+                }
+                
+                // If no OAuth token found, that's an error for restored widget context
+                console.log('[QueueMonitor] ❌ Widget context was restored but no OAuth token found');
+                this.updateConnectionStatus('error', 'Widget context restored but authentication failed');
+                return { success: false, reason: 'missing_oauth_token_after_restore' };
+            }
+            
+            // Normal flow: Check if we're in a Genesys Cloud environment by looking for query parameters
             const urlParams = new URLSearchParams(window.location.search);
             const hasGenesysQueryParams = urlParams.has('gcHostOrigin') || 
                                          urlParams.has('gcTargetEnv') || 
@@ -658,6 +739,8 @@ class QueueMonitor {
                             localStorage.removeItem('genesys-widget-context');
                             console.log('[QueueMonitor] 🧹 Cleaned up preserved context from localStorage');
                             
+                            return true; // Context was successfully restored
+                            
                         } else {
                             console.log('[QueueMonitor] ⏰ Preserved context is too old (', Math.round(contextAge / 1000), 'seconds), ignoring');
                             localStorage.removeItem('genesys-widget-context');
@@ -674,8 +757,11 @@ class QueueMonitor {
                 console.log('[QueueMonitor] ℹ️  No OAuth redirect detected, skipping context restoration');
             }
             
+            return false; // No context was restored
+            
         } catch (error) {
             console.log('[QueueMonitor] ❌ Error checking preserved widget context:', error.message);
+            return false;
         }
     }
 
