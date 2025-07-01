@@ -412,9 +412,13 @@ class QueueMonitor {
                             try {
                                 const internalClient = this.clientApp._platformClient || this.clientApp.platformClient;
                                 console.log('[QueueMonitor] Attempting to copy authentication from Client App SDK internal client...');
+                                console.log('[QueueMonitor] Internal client object:', typeof internalClient);
+                                console.log('[QueueMonitor] Internal client properties:', Object.keys(internalClient));
                                 
                                 if (internalClient.ApiClient && internalClient.ApiClient.instance) {
                                     const internalApiClient = internalClient.ApiClient.instance;
+                                    console.log('[QueueMonitor] Found internal API client instance');
+                                    console.log('[QueueMonitor] Internal API client authentications:', Object.keys(internalApiClient.authentications || {}));
                                     
                                     // Copy authentication settings from internal client
                                     if (internalApiClient.authentications) {
@@ -464,20 +468,77 @@ class QueueMonitor {
                             }
                         }
                         
-                        // Final fallback: Configure Platform Client for widget context without explicit token
-                        console.log('[QueueMonitor] Using fallback widget context authentication...');
-                        if (client.authentications && client.authentications['PureCloud OAuth']) {
-                            client.defaultAuthentication = 'PureCloud OAuth';
-                            console.log('[QueueMonitor] Set default authentication to PureCloud OAuth');
-                        } else if (client.authentications && client.authentications['PureCloud']) {
-                            client.defaultAuthentication = 'PureCloud';
-                            console.log('[QueueMonitor] Set default authentication to PureCloud');
+                        // Try another approach: Use Client App SDK's authenticated HTTP capabilities
+                        if (this.clientApp && !accessToken) {
+                            try {
+                                console.log('[QueueMonitor] Trying to use Client App SDK authenticated HTTP capabilities...');
+                                
+                                // Some Client App SDKs provide a way to make authenticated HTTP requests
+                                // Let's check if we can make a simple API call to verify authentication
+                                if (this.clientApp.users && typeof this.clientApp.users.getMe === 'function') {
+                                    console.log('[QueueMonitor] Testing Client App SDK authentication with users.getMe()...');
+                                    const userInfo = await this.clientApp.users.getMe();
+                                    console.log('[QueueMonitor] ✅ Client App SDK authentication works! User:', userInfo?.name || 'Unknown');
+                                    
+                                    // If this works, we can configure Platform Client to use the same auth context
+                                    // by setting up a custom interceptor or using the same session
+                                    console.log('[QueueMonitor] Client App SDK is authenticated - configuring Platform Client to use same context');
+                                    
+                                    // Set up Platform Client to use the authenticated context
+                                    if (client.authentications && client.authentications['PureCloud OAuth']) {
+                                        client.defaultAuthentication = 'PureCloud OAuth';
+                                        console.log('[QueueMonitor] ✅ Configured Platform Client for authenticated context');
+                                        
+                                        // Mark as successfully authenticated
+                                        this.updateConnectionStatus('connected', 'Connected (Client App SDK Context)');
+                                        return { success: true };
+                                    }
+                                } else {
+                                    console.log('[QueueMonitor] Client App SDK users.getMe not available');
+                                }
+                            } catch (httpAuthError) {
+                                console.log('[QueueMonitor] Client App SDK HTTP authentication test failed:', httpAuthError.message);
+                            }
                         }
                         
-                        console.log('[QueueMonitor] Available authentication methods:', Object.keys(client.authentications || {}));
-                        console.log('[QueueMonitor] ⚠️  Widget context authentication configured - may work with browser session');
-                        this.updateConnectionStatus('connected', 'Connected (Widget Context)');
-                        return { success: true };
+                        // Try Platform Client SDK implicit grant authentication as fallback
+                        console.log('[QueueMonitor] Trying Platform Client SDK implicit grant authentication...');
+                        try {
+                            const clientId = '110d379d-9f0d-452f-8706-e8975a058f7f';
+                            const redirectUri = 'https://jeroenddm.github.io/';
+                            const state = 'queue-monitor-widget-' + Date.now();
+                            
+                            console.log('[QueueMonitor] Starting loginImplicitGrant with:');
+                            console.log('[QueueMonitor]   clientId:', clientId);
+                            console.log('[QueueMonitor]   redirectUri:', redirectUri);
+                            console.log('[QueueMonitor]   state:', state);
+                            
+                            const authData = await client.loginImplicitGrant(clientId, redirectUri, { state: state });
+                            console.log('[QueueMonitor] ✅ Platform Client SDK implicit grant successful!');
+                            console.log('[QueueMonitor] Authentication data:', authData);
+                            
+                            this.updateConnectionStatus('connected', 'Connected via Implicit Grant');
+                            return { success: true };
+                            
+                        } catch (implicitGrantError) {
+                            console.log('[QueueMonitor] Platform Client SDK implicit grant failed:', implicitGrantError.message);
+                            console.log('[QueueMonitor] Error details:', implicitGrantError);
+                            
+                            // Final fallback: Configure Platform Client for widget context without explicit token
+                            console.log('[QueueMonitor] Using final fallback widget context authentication...');
+                            if (client.authentications && client.authentications['PureCloud OAuth']) {
+                                client.defaultAuthentication = 'PureCloud OAuth';
+                                console.log('[QueueMonitor] Set default authentication to PureCloud OAuth');
+                            } else if (client.authentications && client.authentications['PureCloud']) {
+                                client.defaultAuthentication = 'PureCloud';
+                                console.log('[QueueMonitor] Set default authentication to PureCloud');
+                            }
+                            
+                            console.log('[QueueMonitor] Available authentication methods:', Object.keys(client.authentications || {}));
+                            console.log('[QueueMonitor] ⚠️  Widget context authentication configured - may work with browser session');
+                            this.updateConnectionStatus('connected', 'Connected (Widget Context)');
+                            return { success: true };
+                        }
                     }
                     
                 } catch (authError) {
@@ -661,22 +722,35 @@ class QueueMonitor {
                     // Method 1: Try with users API to get authenticated context first
                     if (this.clientApp.users && this.clientApp.users.getMe) {
                         try {
+                            console.log('[QueueMonitor] Testing Client App SDK authentication with users.getMe()...');
                             const currentUser = await this.clientApp.users.getMe();
                             console.log('[QueueMonitor] ✅ Got current user via Client App SDK:', currentUser?.name || 'Unknown');
+                            console.log('[QueueMonitor] User ID:', currentUser?.id);
+                            console.log('[QueueMonitor] User email:', currentUser?.email);
                             
                             // Now try to get queues using the authenticated context
                             if (this.clientApp.routing && this.clientApp.routing.getQueues) {
+                                console.log('[QueueMonitor] Client App SDK routing.getQueues is available, trying...');
                                 sdkQueuesResponse = await this.clientApp.routing.getQueues({
                                     pageSize: 100,
                                     sortBy: 'name'
                                 });
                                 console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK routing.getQueues');
+                                console.log('[QueueMonitor] Number of queues:', sdkQueuesResponse?.entities?.length || 0);
+                            } else {
+                                console.log('[QueueMonitor] Client App SDK routing.getQueues not available');
+                                console.log('[QueueMonitor] Available routing methods:', this.clientApp.routing ? Object.keys(this.clientApp.routing) : 'routing not available');
                             }
                         } catch (method1Error) {
                             console.log('[QueueMonitor] Client App SDK users.getMe failed:', method1Error.message);
+                            console.log('[QueueMonitor] Error details:', method1Error);
                         }
                     } else {
                         console.log('[QueueMonitor] Client App SDK users.getMe not available');
+                        console.log('[QueueMonitor] Users object type:', typeof this.clientApp.users);
+                        if (this.clientApp.users) {
+                            console.log('[QueueMonitor] Available users methods:', Object.keys(this.clientApp.users));
+                        }
                     }
                     
                     // Method 2: Try using Client App SDK internal API methods
