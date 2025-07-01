@@ -337,6 +337,7 @@ class QueueMonitor {
                         console.log('[QueueMonitor] Trying Client App SDK token extraction...');
                         console.log('[QueueMonitor] Client App SDK available properties:', Object.keys(this.clientApp));
                         
+                        // Try multiple ways to get the token from Client App SDK
                         if (this.clientApp._accessToken) {
                             accessToken = this.clientApp._accessToken;
                             console.log('[QueueMonitor] ✅ Token from Client App SDK _accessToken');
@@ -347,7 +348,27 @@ class QueueMonitor {
                             accessToken = this.clientApp.authentication.token;
                             console.log('[QueueMonitor] ✅ Token from Client App SDK authentication.token');
                         } else {
-                            console.log('[QueueMonitor] No token found in Client App SDK');
+                            // Try to get token from Client App SDK's internal platform client
+                            try {
+                                if (this.clientApp._platformClient || this.clientApp.platformClient) {
+                                    const internalClient = this.clientApp._platformClient || this.clientApp.platformClient;
+                                    if (internalClient.ApiClient && internalClient.ApiClient.instance) {
+                                        const apiClientInstance = internalClient.ApiClient.instance;
+                                        const internalToken = apiClientInstance.authentications?.['PureCloud OAuth']?.accessToken ||
+                                                            apiClientInstance.authentications?.PureCloud?.accessToken;
+                                        if (internalToken) {
+                                            accessToken = internalToken;
+                                            console.log('[QueueMonitor] ✅ Token from Client App SDK internal platform client');
+                                        }
+                                    }
+                                }
+                            } catch (internalTokenError) {
+                                console.log('[QueueMonitor] Could not get token from internal platform client:', internalTokenError.message);
+                            }
+                            
+                            if (!accessToken) {
+                                console.log('[QueueMonitor] No token found in Client App SDK');
+                            }
                         }
                     }
                     
@@ -571,35 +592,51 @@ class QueueMonitor {
                     // Use Client App SDK for queue data - try different method signatures
                     let sdkQueuesResponse;
                     
-                    // Method 1: Try with routing API
-                    if (this.clientApp.routing && this.clientApp.routing.getQueues) {
+                    // Method 1: Try with users API to get authenticated context first
+                    if (this.clientApp.users && this.clientApp.users.getMe) {
                         try {
-                            sdkQueuesResponse = await this.clientApp.routing.getQueues({
-                                pageSize: 100,
-                                sortBy: 'name'
-                            });
-                            console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK routing.getQueues');
+                            const currentUser = await this.clientApp.users.getMe();
+                            console.log('[QueueMonitor] ✅ Got current user via Client App SDK:', currentUser?.name || 'Unknown');
+                            
+                            // Now try to get queues using the authenticated context
+                            if (this.clientApp.routing && this.clientApp.routing.getQueues) {
+                                sdkQueuesResponse = await this.clientApp.routing.getQueues({
+                                    pageSize: 100,
+                                    sortBy: 'name'
+                                });
+                                console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK routing.getQueues');
+                            }
                         } catch (method1Error) {
-                            console.log('[QueueMonitor] Client App SDK routing.getQueues failed:', method1Error.message);
+                            console.log('[QueueMonitor] Client App SDK users.getMe failed:', method1Error.message);
                         }
                     } else {
-                        console.log('[QueueMonitor] Client App SDK routing.getQueues not available');
+                        console.log('[QueueMonitor] Client App SDK users.getMe not available');
                     }
                     
-                    // Method 2: Try with pureCloudSession API call
-                    if (!sdkQueuesResponse && this.clientApp.pureCloudSession && this.clientApp.pureCloudSession.makeApiCall) {
+                    // Method 2: Try using Client App SDK internal API methods
+                    if (!sdkQueuesResponse) {
                         try {
-                            const queryParams = new URLSearchParams({
-                                pageSize: '100',
-                                sortBy: 'name'
-                            });
-                            sdkQueuesResponse = await this.clientApp.pureCloudSession.makeApiCall('GET', `/api/v2/routing/queues?${queryParams}`);
-                            console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK pureCloudSession');
+                            // Check if the Client App SDK has internal API access
+                            console.log('[QueueMonitor] Checking for Client App SDK internal API access...');
+                            
+                            // Try to access the routing queues through the SDK's internal methods
+                            // The Client App SDK might have different method names or structures
+                            if (this.clientApp._platformClient || this.clientApp.platformClient) {
+                                const platformClient = this.clientApp._platformClient || this.clientApp.platformClient;
+                                console.log('[QueueMonitor] Found platform client in Client App SDK');
+                                
+                                if (platformClient.RoutingApi) {
+                                    const routingApi = new platformClient.RoutingApi();
+                                    sdkQueuesResponse = await routingApi.getRoutingQueues({
+                                        pageSize: 100,
+                                        sortBy: 'name'
+                                    });
+                                    console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK internal platform client');
+                                }
+                            }
                         } catch (method2Error) {
-                            console.log('[QueueMonitor] Client App SDK pureCloudSession failed:', method2Error.message);
+                            console.log('[QueueMonitor] Client App SDK internal API failed:', method2Error.message);
                         }
-                    } else {
-                        console.log('[QueueMonitor] Client App SDK pureCloudSession.makeApiCall not available');
                     }
                     
                     // Method 3: Try with direct API call if available
@@ -793,20 +830,19 @@ class QueueMonitor {
             // Try Client App SDK first if in widget mode
             if (this.isWidgetMode && this.clientApp) {
                 try {
-                    // Method 1: Try with analytics API
-                    if (this.clientApp.analytics && this.clientApp.analytics.postAnalyticsQueuesObservationsQuery) {
+                    // Method 1: Try with internal platform client analytics API
+                    if (this.clientApp._platformClient || this.clientApp.platformClient) {
+                        const internalClient = this.clientApp._platformClient || this.clientApp.platformClient;
+                        if (internalClient.AnalyticsApi) {
+                            const analyticsApi = new internalClient.AnalyticsApi();
+                            response = await analyticsApi.postAnalyticsQueuesObservationsQuery(query);
+                            console.log('[QueueMonitor] ✅ Analytics data loaded via Client App SDK internal analytics API');
+                        }
+                    }
+                    // Method 2: Try with analytics API if available
+                    else if (this.clientApp.analytics && this.clientApp.analytics.postAnalyticsQueuesObservationsQuery) {
                         response = await this.clientApp.analytics.postAnalyticsQueuesObservationsQuery(query);
                         console.log('[QueueMonitor] ✅ Analytics data loaded via Client App SDK analytics API');
-                    }
-                    // Method 2: Try with pureCloudSession API call
-                    else if (this.clientApp.pureCloudSession) {
-                        response = await this.clientApp.pureCloudSession.makeApiCall('POST', '/api/v2/analytics/queues/observations/query', query);
-                        console.log('[QueueMonitor] ✅ Analytics data loaded via Client App SDK pureCloudSession');
-                    }
-                    // Method 3: Try with direct API call if available
-                    else if (this.clientApp.api) {
-                        response = await this.clientApp.api.post('/analytics/queues/observations/query', query);
-                        console.log('[QueueMonitor] ✅ Analytics data loaded via Client App SDK api.post');
                     }
                 } catch (sdkError) {
                     console.log('[QueueMonitor] Client App SDK analytics failed:', sdkError.message);
