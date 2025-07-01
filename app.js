@@ -1581,10 +1581,26 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             // For blind transfers to queue, use postConversationsCallParticipantReplaceQueue
             // We need to get the caller's participant ID (not the agent's)
             const conversationDetails = await this.conversationsApi.getConversationsCall(this.currentConversationId);
-            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'external' && p.state === 'connected');
+            
+            console.log('[QueueMonitor] Conversation details:', conversationDetails);
+            console.log('[QueueMonitor] Available participants:', conversationDetails.participants);
+            
+            // Log each participant for debugging
+            conversationDetails.participants.forEach((participant, index) => {
+                console.log(`[QueueMonitor] Participant ${index}:`, {
+                    participantId: participant.participantId,
+                    purpose: participant.purpose,
+                    participantName: participant.participantName,
+                    userId: participant.userId
+                });
+            });
+            
+            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'external');
             
             if (!callerParticipant) {
-                throw new Error('Could not find connected caller participant');
+                console.log('[QueueMonitor] ❌ Could not find caller participant with purpose="external"');
+                console.log('[QueueMonitor] Available purposes:', [...new Set(conversationDetails.participants.map(p => p.purpose))]);
+                throw new Error('Could not find caller participant');
             }
             
             const transferBody = {
@@ -1593,12 +1609,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 queueName: this.selectedQueue.name
             };
             
-            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.id);
+            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.participantId);
             console.log('[QueueMonitor] Transfer body:', transferBody);
             
             const result = await this.conversationsApi.postConversationsCallParticipantReplaceQueue(
                 this.currentConversationId,
-                callerParticipant.id,
+                callerParticipant.participantId,
                 transferBody
             );
             
@@ -1645,10 +1661,26 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             // For consult transfers to queue, use postConversationsCallParticipantConsultQueue
             // We need to get the caller's participant ID (not the agent's)
             const conversationDetails = await this.conversationsApi.getConversationsCall(this.currentConversationId);
-            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'external' && p.state === 'connected');
+            
+            console.log('[QueueMonitor] Conversation details:', conversationDetails);
+            console.log('[QueueMonitor] Available participants:', conversationDetails.participants);
+            
+            // Log each participant for debugging
+            conversationDetails.participants.forEach((participant, index) => {
+                console.log(`[QueueMonitor] Participant ${index}:`, {
+                    participantId: participant.participantId,
+                    purpose: participant.purpose,
+                    participantName: participant.participantName,
+                    userId: participant.userId
+                });
+            });
+            
+            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'external');
             
             if (!callerParticipant) {
-                throw new Error('Could not find connected caller participant');
+                console.log('[QueueMonitor] ❌ Could not find caller participant with purpose="external"');
+                console.log('[QueueMonitor] Available purposes:', [...new Set(conversationDetails.participants.map(p => p.purpose))]);
+                throw new Error('Could not find caller participant');
             }
             
             const consultBody = {
@@ -1657,12 +1689,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 queueName: this.selectedQueue.name
             };
             
-            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.id);
+            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.participantId);
             console.log('[QueueMonitor] Consult body:', consultBody);
             
             const result = await this.conversationsApi.postConversationsCallParticipantConsultQueue(
                 this.currentConversationId,
-                callerParticipant.id,
+                callerParticipant.participantId,
                 consultBody
             );
             
