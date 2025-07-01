@@ -1588,17 +1588,18 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             // Log each participant for debugging
             conversationDetails.participants.forEach((participant, index) => {
                 console.log(`[QueueMonitor] Participant ${index}:`, {
-                    participantId: participant.participantId,
+                    id: participant.id,
                     purpose: participant.purpose,
-                    participantName: participant.participantName,
-                    userId: participant.userId
+                    name: participant.name,
+                    state: participant.state,
+                    userId: participant.user?.id
                 });
             });
             
-            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'external');
+            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'customer');
             
             if (!callerParticipant) {
-                console.log('[QueueMonitor] ❌ Could not find caller participant with purpose="external"');
+                console.log('[QueueMonitor] ❌ Could not find caller participant with purpose="customer"');
                 console.log('[QueueMonitor] Available purposes:', [...new Set(conversationDetails.participants.map(p => p.purpose))]);
                 throw new Error('Could not find caller participant');
             }
@@ -1609,12 +1610,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 queueName: this.selectedQueue.name
             };
             
-            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.participantId);
+            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.id);
             console.log('[QueueMonitor] Transfer body:', transferBody);
             
             const result = await this.conversationsApi.postConversationsCallParticipantReplaceQueue(
                 this.currentConversationId,
-                callerParticipant.participantId,
+                callerParticipant.id,
                 transferBody
             );
             
@@ -1668,17 +1669,18 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             // Log each participant for debugging
             conversationDetails.participants.forEach((participant, index) => {
                 console.log(`[QueueMonitor] Participant ${index}:`, {
-                    participantId: participant.participantId,
+                    id: participant.id,
                     purpose: participant.purpose,
-                    participantName: participant.participantName,
-                    userId: participant.userId
+                    name: participant.name,
+                    state: participant.state,
+                    userId: participant.user?.id
                 });
             });
             
-            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'external');
+            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'customer');
             
             if (!callerParticipant) {
-                console.log('[QueueMonitor] ❌ Could not find caller participant with purpose="external"');
+                console.log('[QueueMonitor] ❌ Could not find caller participant with purpose="customer"');
                 console.log('[QueueMonitor] Available purposes:', [...new Set(conversationDetails.participants.map(p => p.purpose))]);
                 throw new Error('Could not find caller participant');
             }
@@ -1689,12 +1691,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 queueName: this.selectedQueue.name
             };
             
-            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.participantId);
+            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.id);
             console.log('[QueueMonitor] Consult body:', consultBody);
             
             const result = await this.conversationsApi.postConversationsCallParticipantConsultQueue(
                 this.currentConversationId,
-                callerParticipant.participantId,
+                callerParticipant.id,
                 consultBody
             );
             
