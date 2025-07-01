@@ -1516,7 +1516,14 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 }
             }
             
-            // Alternative: Check URL parameters for conversation/interaction ID
+            // Check restored widget context first (for post-OAuth scenarios)
+            if (this.urlParams && this.urlParams.conversationId) {
+                console.log('[QueueMonitor] 🎯 Found conversation ID from restored widget context:', this.urlParams.conversationId);
+                this.currentConversationId = this.urlParams.conversationId;
+                return;
+            }
+            
+            // Fallback: Check current URL parameters for conversation/interaction ID  
             const urlParams = new URLSearchParams(window.location.search);
             const conversationId = urlParams.get('conversationId') || 
                                  urlParams.get('iid') || 
@@ -1528,20 +1535,21 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 interactionId: urlParams.get('interactionId')
             });
             
-            // Check for the interpolated conversation ID parameter
-            const interpolatedConversationId = urlParams.get('conversationId');
-            if (interpolatedConversationId) {
-                console.log('[QueueMonitor] Found interpolated conversation ID:', interpolatedConversationId);
-            }
+            console.log('[QueueMonitor] Widget context check:', {
+                widgetContextConversationId: this.urlParams?.conversationId,
+                isWidgetMode: this.isWidgetMode,
+                isStandalone: this.isStandalone
+            });
             
             if (conversationId) {
                 this.currentConversationId = conversationId;
-                console.log('[QueueMonitor] Found conversation ID from URL:', this.currentConversationId);
+                console.log('[QueueMonitor] Found conversation ID from URL parameters:', this.currentConversationId);
             } else {
                 if (this.isStandalone) {
                     console.log('[QueueMonitor] No active conversation found - running in standalone mode');
                 } else {
                     console.warn('[QueueMonitor] No active conversation found - this may indicate the widget is not properly integrated');
+                    console.warn('[QueueMonitor] Expected conversation ID from widget context or URL parameters');
                 }
             }
         } catch (error) {
