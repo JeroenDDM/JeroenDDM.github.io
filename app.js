@@ -235,284 +235,174 @@ class QueueMonitor {
                 
                 const client = this.platformClient.ApiClient.instance;
                 
-                // Try to authenticate using implicit grant
-                try {
-                    // Check if we already have a token from a previous authentication
-                    const existingToken = client.authentications?.PureCloud?.accessToken;
-                    if (existingToken) {
-                        console.log('[QueueMonitor] Using existing access token:', existingToken.substring(0, 20) + '...');
-                        this.updateConnectionStatus('connected', 'Connected');
-                        return { success: true };
-                    }
+                // For Genesys Cloud widgets, use Platform Client SDK authentication
+                console.log('[QueueMonitor] ======================================');
+                console.log('[QueueMonitor] CONFIGURING WIDGET AUTHENTICATION');
+                console.log('[QueueMonitor] ======================================');
+                console.log('[QueueMonitor] Using Platform Client SDK for widget authentication...');
+                
+                                                try {
+                                    // Configure the environment from the interpolated parameters
+                                    const gcHostOrigin = urlParams.get('gcHostOrigin');
+                                    const gcTargetEnv = urlParams.get('gcTargetEnv');
+                                    
+                                    if (gcHostOrigin && gcTargetEnv) {
+                                        console.log('[QueueMonitor] Configuring environment for widget mode');
+                                        console.log('[QueueMonitor] Host Origin:', gcHostOrigin);
+                                        console.log('[QueueMonitor] Target Environment:', gcTargetEnv);
+                                        
+                                        // Set the correct environment for the platform client
+                                        let environment = 'mypurecloud.ie'; // default
+                                        if (gcHostOrigin.includes('mypurecloud.com')) {
+                                            environment = 'mypurecloud.com';
+                                        } else if (gcHostOrigin.includes('mypurecloud.com.au')) {
+                                            environment = 'mypurecloud.com.au';
+                                        } else if (gcHostOrigin.includes('mypurecloud.jp')) {
+                                            environment = 'mypurecloud.jp';
+                                        } else if (gcHostOrigin.includes('mypurecloud.de')) {
+                                            environment = 'mypurecloud.de';
+                                        }
+                                        
+                                        console.log('[QueueMonitor] Detected environment:', environment);
+                                        
+                                        // Configure platform client environment
+                                        let regionHost;
+                                        if (environment === 'mypurecloud.ie') {
+                                            regionHost = this.platformClient.PureCloudRegionHosts.eu_west_1;
+                                        } else if (environment === 'mypurecloud.com') {
+                                            regionHost = this.platformClient.PureCloudRegionHosts.us_east_1;
+                                        } else if (environment === 'mypurecloud.com.au') {
+                                            regionHost = this.platformClient.PureCloudRegionHosts.ap_southeast_2;
+                                        } else if (environment === 'mypurecloud.jp') {
+                                            regionHost = this.platformClient.PureCloudRegionHosts.ap_northeast_1;
+                                        } else if (environment === 'mypurecloud.de') {
+                                            regionHost = this.platformClient.PureCloudRegionHosts.eu_central_1;
+                                        }
+                                        
+                                        client.setEnvironment(regionHost);
+                                        console.log('[QueueMonitor] Platform client environment configured');
+                                    }
+                                    
+                                    // In widget mode, we need to handle authentication properly
+                                    // Check if we already have authentication data in the URL
+                                    const hash = window.location.hash;
+                                    const search = window.location.search;
+                                    
+                                    console.log('[QueueMonitor] Current URL hash:', hash ? hash.substring(0, 100) + '...' : 'none');
+                                    console.log('[QueueMonitor] Current URL search:', search);
                     
-                    // Try multiple methods to find an access token
-                    let foundToken = null;
-                    
-                    // Method 1: Check URL hash (from OAuth redirect)
-                    if (window.location.hash) {
-                        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                        foundToken = hashParams.get('access_token');
-                        if (foundToken) {
-                            console.log('[QueueMonitor] Found access token in URL hash');
-                        }
-                    }
-                    
-                    // Method 2: Check session/local storage
-                    if (!foundToken) {
-                        const storageKeys = [
-                            'purecloud_access_token',
-                            'access_token',
-                            'gc_access_token',
-                            'authToken',
-                            'bearer_token'
-                        ];
+                    // Try Platform Client SDK implicit grant authentication
+                    if (hash && (hash.includes('access_token') || hash.includes('error'))) {
+                        console.log('[QueueMonitor] Found OAuth response in URL hash - processing with Platform Client SDK...');
                         
-                        for (const key of storageKeys) {
-                            foundToken = sessionStorage.getItem(key) || localStorage.getItem(key);
-                            if (foundToken) {
-                                console.log('[QueueMonitor] Found access token in storage with key:', key);
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // Method 3: Try to get token from parent window (if in iframe)
-                    if (!foundToken && window.parent !== window) {
                         try {
-                            for (const key of ['purecloud_access_token', 'access_token', 'gc_access_token']) {
-                                foundToken = window.parent.sessionStorage?.getItem(key) || 
-                                           window.parent.localStorage?.getItem(key);
-                                if (foundToken) {
-                                    console.log('[QueueMonitor] Found access token in parent window with key:', key);
-                                    break;
-                                }
-                            }
-                        } catch (e) {
-                            console.log('[QueueMonitor] Cannot access parent window storage (cross-origin)');
-                        }
-                    }
-                    
-                    // Method 4: Check if token is available via Client App SDK
-                    if (!foundToken && window.purecloud?.apps?.ClientApp) {
-                        try {
-                            console.log('[QueueMonitor] Attempting to get token via Client App SDK');
-                            const clientApp = new window.purecloud.apps.ClientApp();
-                            
-                            // Try to get the current user's authentication info
-                            // This might provide access to the token or authenticated context
-                            const authInfo = await new Promise((resolve, reject) => {
-                                const timeout = setTimeout(() => reject(new Error('Timeout')), 3000);
-                                
-                                // Try different methods that might be available
-                                if (typeof clientApp.getAuthToken === 'function') {
-                                    clientApp.getAuthToken().then(resolve).catch(reject);
-                                } else if (typeof clientApp.users?.me === 'function') {
-                                    clientApp.users.me().then(resolve).catch(reject);
-                                } else {
-                                    // If no specific methods, just resolve with null
-                                    clearTimeout(timeout);
-                                    resolve(null);
-                                }
+                            // Use Platform Client SDK to handle the implicit grant response
+                            const authData = await client.loginImplicitGrant();
+                            console.log('[QueueMonitor] ✅ Platform Client SDK implicit grant successful');
+                            console.log('[QueueMonitor] Authentication data received:', {
+                                hasAccessToken: !!authData.accessToken,
+                                hasTokenType: !!authData.tokenType,
+                                hasExpiresIn: !!authData.expiresIn,
+                                expiresIn: authData.expiresIn,
+                                hasState: !!authData.state
                             });
                             
-                            if (authInfo && authInfo.token) {
-                                foundToken = authInfo.token;
-                                console.log('[QueueMonitor] Got token from Client App SDK');
-                            }
-                        } catch (e) {
-                            console.log('[QueueMonitor] Could not get token via Client App SDK:', e.message);
+                            this.updateConnectionStatus('connected', 'Connected via Platform Client SDK');
+                            return { success: true };
+                            
+                        } catch (implicitGrantError) {
+                            console.log('[QueueMonitor] Platform Client SDK implicit grant failed:', implicitGrantError.message);
+                            console.log('[QueueMonitor] Trying manual token extraction...');
                         }
                     }
                     
-                    if (foundToken) {
-                        console.log('[QueueMonitor] Setting access token on Platform Client:', foundToken.substring(0, 20) + '...');
-                        client.setAccessToken(foundToken);
-                        this.updateConnectionStatus('connected', 'Connected');
-                        return { success: true };
-                    }
+                    // Manual token extraction as fallback
+                    let accessToken = null;
                     
-                    // Method 5: For Genesys Cloud widgets, use Client App SDK authentication
-                    console.log('[QueueMonitor] No token found, attempting Client App SDK authentication...');
-                    
-                    if (this.clientApp) {
+                    // Method 1: Extract from URL hash manually
+                    if (hash && hash.includes('access_token')) {
                         try {
-                            console.log('[QueueMonitor] Using Client App SDK for widget authentication');
-                            
-                            // Configure the environment from the interpolated parameters
-                            const gcHostOrigin = urlParams.get('gcHostOrigin');
-                            const gcTargetEnv = urlParams.get('gcTargetEnv');
-                            
-                            if (gcHostOrigin && gcTargetEnv) {
-                                console.log('[QueueMonitor] Configuring environment for widget mode');
-                                console.log('[QueueMonitor] Host Origin:', gcHostOrigin);
-                                console.log('[QueueMonitor] Target Environment:', gcTargetEnv);
-                                
-                                // Set the correct environment for the platform client
-                                let environment = 'mypurecloud.ie'; // default
-                                if (gcHostOrigin.includes('mypurecloud.com')) {
-                                    environment = 'mypurecloud.com';
-                                } else if (gcHostOrigin.includes('mypurecloud.com.au')) {
-                                    environment = 'mypurecloud.com.au';
-                                } else if (gcHostOrigin.includes('mypurecloud.jp')) {
-                                    environment = 'mypurecloud.jp';
-                                } else if (gcHostOrigin.includes('mypurecloud.de')) {
-                                    environment = 'mypurecloud.de';
-                                }
-                                
-                                console.log('[QueueMonitor] Detected environment:', environment);
-                                
-                                // Configure platform client environment
-                                let regionHost;
-                                if (environment === 'mypurecloud.ie') {
-                                    regionHost = this.platformClient.PureCloudRegionHosts.eu_west_1;
-                                } else if (environment === 'mypurecloud.com') {
-                                    regionHost = this.platformClient.PureCloudRegionHosts.us_east_1;
-                                } else if (environment === 'mypurecloud.com.au') {
-                                    regionHost = this.platformClient.PureCloudRegionHosts.ap_southeast_2;
-                                } else if (environment === 'mypurecloud.jp') {
-                                    regionHost = this.platformClient.PureCloudRegionHosts.ap_northeast_1;
-                                } else if (environment === 'mypurecloud.de') {
-                                    regionHost = this.platformClient.PureCloudRegionHosts.eu_central_1;
-                                }
-                                
-                                client.setEnvironment(regionHost);
-                                console.log('[QueueMonitor] Platform client environment configured');
-                                
-                                // For widgets, get authentication token from Client App SDK
-                                console.log('[QueueMonitor] ======================================');
-                                console.log('[QueueMonitor] CONFIGURING WIDGET AUTHENTICATION');
-                                console.log('[QueueMonitor] ======================================');
-                                console.log('[QueueMonitor] Getting authentication token from Client App SDK...');
-                                
-                                try {
-                                    // Get the token from the Client App SDK
-                                    const tokenInfo = await this.clientApp.users.getMe();
-                                    console.log('[QueueMonitor] Client App SDK user info retrieved successfully');
-                                    
-                                    // Try to get the access token using the Client App SDK's authentication
-                                    // The proper way is to use the Client App SDK's internal token
-                                    let accessToken = null;
-                                    
-                                    // Method 1: Try to get token from Client App SDK directly
-                                    if (this.clientApp._accessToken) {
-                                        accessToken = this.clientApp._accessToken;
-                                        console.log('[QueueMonitor] Token retrieved from Client App SDK _accessToken');
-                                    }
-                                    // Method 2: Try to get from authentication object
-                                    else if (this.clientApp.auth && this.clientApp.auth.accessToken) {
-                                        accessToken = this.clientApp.auth.accessToken;
-                                        console.log('[QueueMonitor] Token retrieved from Client App SDK auth.accessToken');
-                                    }
-                                    // Method 3: Try to get from session storage through SDK
-                                    else {
-                                        try {
-                                            // For newer SDK versions, we can get the token through the SDK's method
-                                            const session = await this.clientApp.session.getSession();
-                                            if (session && session.accessToken) {
-                                                accessToken = session.accessToken;
-                                                console.log('[QueueMonitor] Token retrieved from Client App SDK session');
-                                            }
-                                        } catch (sessionError) {
-                                            console.log('[QueueMonitor] Could not get token from session:', sessionError.message);
-                                        }
-                                    }
-                                    
-                                    if (accessToken) {
-                                        console.log('[QueueMonitor] ✅ Access token obtained from Client App SDK');
-                                        console.log('[QueueMonitor] Token preview:', accessToken.substring(0, 20) + '...');
-                                        
-                                        // Set the token on the Platform Client
-                                        console.log('[QueueMonitor] Setting token on Platform Client...');
-                                        
-                                        // Method 1: Use setAccessToken
-                                        client.setAccessToken(accessToken);
-                                        console.log('[QueueMonitor] Method 1 - setAccessToken called');
-                                        
-                                        // Method 2: Set on authentication object directly
-                                        if (client.authentications && client.authentications['PureCloud OAuth']) {
-                                            client.authentications['PureCloud OAuth'].accessToken = accessToken;
-                                            client.defaultAuthentication = 'PureCloud OAuth';
-                                            console.log('[QueueMonitor] Method 2 - PureCloud OAuth token set');
-                                        } else if (client.authentications && client.authentications['PureCloud']) {
-                                            client.authentications['PureCloud'].accessToken = accessToken;
-                                            client.defaultAuthentication = 'PureCloud';
-                                            console.log('[QueueMonitor] Method 2 - PureCloud token set');
-                                        }
-                                        
-                                        // Method 3: Set Authorization header directly
-                                        client.defaultHeaders = client.defaultHeaders || {};
-                                        client.defaultHeaders['Authorization'] = `Bearer ${accessToken}`;
-                                        console.log('[QueueMonitor] Method 3 - Authorization header set');
-                                        
-                                        // Verify the token is set
-                                        console.log('[QueueMonitor] === POST-AUTHENTICATION STATE ===');
-                                        console.log('[QueueMonitor] Access token set:', !!client.authentications?.['PureCloud OAuth']?.accessToken || !!client.authentications?.PureCloud?.accessToken);
-                                        console.log('[QueueMonitor] Authorization header set:', !!client.defaultHeaders?.['Authorization']);
-                                        console.log('[QueueMonitor] Default authentication:', client.defaultAuthentication);
-                                        console.log('[QueueMonitor] === END POST-AUTHENTICATION STATE ===');
-                                        
-                                        console.log('[QueueMonitor] ✅ Widget authentication configured successfully with token');
-                                        this.updateConnectionStatus('connected', 'Connected via Widget Authentication');
-                                        return { success: true };
-                                        
-                                                                         } else {
-                                         console.log('[QueueMonitor] ⚠️  Could not retrieve access token from Client App SDK');
-                                         console.log('[QueueMonitor] Available properties on clientApp:', Object.keys(this.clientApp));
-                                         
-                                         // Log available API methods for debugging
-                                         if (this.clientApp.routing) {
-                                             console.log('[QueueMonitor] Available routing methods:', Object.keys(this.clientApp.routing));
-                                         }
-                                         if (this.clientApp.analytics) {
-                                             console.log('[QueueMonitor] Available analytics methods:', Object.keys(this.clientApp.analytics));
-                                         }
-                                         if (this.clientApp.users) {
-                                             console.log('[QueueMonitor] Available users methods:', Object.keys(this.clientApp.users));
-                                         }
-                                         if (this.clientApp.api) {
-                                             console.log('[QueueMonitor] API object available:', typeof this.clientApp.api);
-                                         }
-                                         if (this.clientApp.pureCloudSession) {
-                                             console.log('[QueueMonitor] pureCloudSession available:', typeof this.clientApp.pureCloudSession);
-                                         }
-                                         
-                                         // Fall back to setting up authentication without explicit token
-                                         // The Platform Client might still work in widget context
-                                         if (client.authentications && client.authentications['PureCloud OAuth']) {
-                                             client.defaultAuthentication = 'PureCloud OAuth';
-                                             console.log('[QueueMonitor] Fall back - set default authentication to PureCloud OAuth');
-                                         } else if (client.authentications && client.authentications['PureCloud']) {
-                                             client.defaultAuthentication = 'PureCloud';
-                                             console.log('[QueueMonitor] Fall back - set default authentication to PureCloud');
-                                         }
-                                         
-                                         console.log('[QueueMonitor] ⚠️  Widget authentication configured without explicit token - may work in widget context');
-                                         this.updateConnectionStatus('connected', 'Connected (Widget Context)');
-                                         return { success: true };
-                                     }
-                                    
-                                } catch (authError) {
-                                    console.error('[QueueMonitor] ❌ Error during widget authentication:', authError);
-                                    console.error('[QueueMonitor] Error details:', authError.message);
-                                    console.error('[QueueMonitor] Error stack:', authError.stack);
-                                    
-                                    // Don't throw - try to continue anyway as widget context might work
-                                    console.log('[QueueMonitor] Continuing despite authentication error - widget context may still work');
-                                    this.updateConnectionStatus('warning', 'Authentication Warning');
-                                    return { success: true };
-                                }
+                            const hashParams = new URLSearchParams(hash.substring(1));
+                            accessToken = hashParams.get('access_token');
+                            if (accessToken) {
+                                console.log('[QueueMonitor] ✅ Token extracted from URL hash');
                             }
-                        } catch (widgetAuthError) {
-                            console.log('[QueueMonitor] Client App SDK authentication failed:', widgetAuthError.message);
+                        } catch (hashError) {
+                            console.log('[QueueMonitor] Failed to extract token from hash:', hashError.message);
                         }
+                    }
+                    
+                    // Method 2: Try to get from Client App SDK
+                    if (!accessToken && this.clientApp) {
+                        console.log('[QueueMonitor] Trying Client App SDK token extraction...');
+                        console.log('[QueueMonitor] Client App SDK available properties:', Object.keys(this.clientApp));
+                        
+                        if (this.clientApp._accessToken) {
+                            accessToken = this.clientApp._accessToken;
+                            console.log('[QueueMonitor] ✅ Token from Client App SDK _accessToken');
+                        } else if (this.clientApp.auth && this.clientApp.auth.accessToken) {
+                            accessToken = this.clientApp.auth.accessToken;
+                            console.log('[QueueMonitor] ✅ Token from Client App SDK auth.accessToken');
+                        } else if (this.clientApp.authentication && this.clientApp.authentication.token) {
+                            accessToken = this.clientApp.authentication.token;
+                            console.log('[QueueMonitor] ✅ Token from Client App SDK authentication.token');
+                        } else {
+                            console.log('[QueueMonitor] No token found in Client App SDK');
+                        }
+                    }
+                    
+                    // Set the token if we found one
+                    if (accessToken) {
+                        console.log('[QueueMonitor] ✅ Access token obtained, setting on Platform Client...');
+                        console.log('[QueueMonitor] Token preview:', accessToken.substring(0, 20) + '...');
+                        
+                        // Use the official Platform Client SDK method to set the token
+                        client.setAccessToken(accessToken);
+                        console.log('[QueueMonitor] Platform Client setAccessToken() called');
+                        
+                        // Verify the token is set
+                        const currentToken = client.authentications?.['PureCloud OAuth']?.accessToken || 
+                                           client.authentications?.PureCloud?.accessToken;
+                        console.log('[QueueMonitor] Token verification:', {
+                            tokenSet: !!currentToken,
+                            defaultAuth: client.defaultAuthentication,
+                            hasAuthHeader: !!client.defaultHeaders?.['Authorization']
+                        });
+                        
+                        console.log('[QueueMonitor] ✅ Platform Client authentication configured successfully');
+                        this.updateConnectionStatus('connected', 'Connected with Access Token');
+                        return { success: true };
+                        
+                    } else {
+                        console.log('[QueueMonitor] ⚠️  No access token found - configuring for widget context');
+                        
+                        // Configure Platform Client for widget context without explicit token
+                        // Sometimes widgets work with implicit browser authentication
+                        if (client.authentications && client.authentications['PureCloud OAuth']) {
+                            client.defaultAuthentication = 'PureCloud OAuth';
+                            console.log('[QueueMonitor] Set default authentication to PureCloud OAuth');
+                        } else if (client.authentications && client.authentications['PureCloud']) {
+                            client.defaultAuthentication = 'PureCloud';
+                            console.log('[QueueMonitor] Set default authentication to PureCloud');
+                        }
+                        
+                        console.log('[QueueMonitor] Available authentication methods:', Object.keys(client.authentications || {}));
+                        
+                        console.log('[QueueMonitor] ⚠️  Widget context authentication configured - may work with browser session');
+                        this.updateConnectionStatus('connected', 'Connected (Widget Context)');
+                        return { success: true };
                     }
                     
                 } catch (authError) {
-                    console.error('[QueueMonitor] Implicit grant authentication failed:', authError);
-                    // Don't throw the error - continue and see if API calls work anyway
-                    console.log('[QueueMonitor] Continuing without explicit authentication - may work in Genesys Cloud context');
+                    console.error('[QueueMonitor] ❌ Error during widget authentication:', authError);
+                    console.error('[QueueMonitor] Error details:', authError.message);
+                    console.error('[QueueMonitor] Error stack:', authError.stack);
+                    
+                    // Don't throw - try to continue anyway as widget context might work
+                    console.log('[QueueMonitor] Continuing despite authentication error - widget context may still work');
+                    this.updateConnectionStatus('warning', 'Authentication Warning');
+                    return { success: true };
                 }
-                
             } else {
                 console.log('[QueueMonitor] === FINAL DETERMINATION ===');
                 console.log('[QueueMonitor] ⚠️  STANDALONE MODE DETECTED');
@@ -669,6 +559,15 @@ class QueueMonitor {
                 
                 // Try Client App SDK first for widget mode
                 try {
+                    // Log what's available on the Client App SDK
+                    console.log('[QueueMonitor] Client App SDK available properties:', Object.keys(this.clientApp));
+                    if (this.clientApp.routing) {
+                        console.log('[QueueMonitor] Client App SDK routing methods:', Object.keys(this.clientApp.routing));
+                    }
+                    if (this.clientApp.api) {
+                        console.log('[QueueMonitor] Client App SDK api methods:', Object.keys(this.clientApp.api));
+                    }
+                    
                     // Use Client App SDK for queue data - try different method signatures
                     let sdkQueuesResponse;
                     
@@ -683,31 +582,50 @@ class QueueMonitor {
                         } catch (method1Error) {
                             console.log('[QueueMonitor] Client App SDK routing.getQueues failed:', method1Error.message);
                         }
+                    } else {
+                        console.log('[QueueMonitor] Client App SDK routing.getQueues not available');
                     }
                     
                     // Method 2: Try with pureCloudSession API call
-                    if (!sdkQueuesResponse && this.clientApp.pureCloudSession) {
+                    if (!sdkQueuesResponse && this.clientApp.pureCloudSession && this.clientApp.pureCloudSession.makeApiCall) {
                         try {
-                            sdkQueuesResponse = await this.clientApp.pureCloudSession.makeApiCall('GET', '/api/v2/routing/queues', {
-                                pageSize: 100,
+                            const queryParams = new URLSearchParams({
+                                pageSize: '100',
                                 sortBy: 'name'
                             });
+                            sdkQueuesResponse = await this.clientApp.pureCloudSession.makeApiCall('GET', `/api/v2/routing/queues?${queryParams}`);
                             console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK pureCloudSession');
                         } catch (method2Error) {
                             console.log('[QueueMonitor] Client App SDK pureCloudSession failed:', method2Error.message);
                         }
+                    } else {
+                        console.log('[QueueMonitor] Client App SDK pureCloudSession.makeApiCall not available');
                     }
                     
                     // Method 3: Try with direct API call if available
-                    if (!sdkQueuesResponse && this.clientApp.api) {
+                    if (!sdkQueuesResponse && this.clientApp.api && this.clientApp.api.get) {
                         try {
                             sdkQueuesResponse = await this.clientApp.api.get('/routing/queues', {
-                                pageSize: 100,
-                                sortBy: 'name'
+                                params: {
+                                    pageSize: 100,
+                                    sortBy: 'name'
+                                }
                             });
                             console.log('[QueueMonitor] ✅ Queues loaded via Client App SDK api.get');
                         } catch (method3Error) {
                             console.log('[QueueMonitor] Client App SDK api.get failed:', method3Error.message);
+                        }
+                    } else {
+                        console.log('[QueueMonitor] Client App SDK api.get not available');
+                    }
+                    
+                    // Method 4: Try with myClientApp methods (some SDK versions)
+                    if (!sdkQueuesResponse && this.clientApp.myClientApp) {
+                        try {
+                            console.log('[QueueMonitor] Trying myClientApp methods...');
+                            // This is a fallback for some SDK implementations
+                        } catch (method4Error) {
+                            console.log('[QueueMonitor] Client App SDK myClientApp failed:', method4Error.message);
                         }
                     }
                     
