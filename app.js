@@ -1596,12 +1596,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 });
             });
             
-            const callerParticipant = conversationDetails.participants.find(p => p.purpose === 'customer');
+            const agentParticipant = conversationDetails.participants.find(p => p.purpose === 'agent');
             
-            if (!callerParticipant) {
-                console.log('[QueueMonitor] ❌ Could not find caller participant with purpose="customer"');
+            if (!agentParticipant) {
+                console.log('[QueueMonitor] ❌ Could not find agent participant with purpose="agent"');
                 console.log('[QueueMonitor] Available purposes:', [...new Set(conversationDetails.participants.map(p => p.purpose))]);
-                throw new Error('Could not find caller participant');
+                throw new Error('Could not find agent participant');
             }
             
             const transferBody = {
@@ -1610,12 +1610,12 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
                 queueName: this.selectedQueue.name
             };
             
-            console.log('[QueueMonitor] Using caller participant ID:', callerParticipant.id);
+            console.log('[QueueMonitor] Using agent participant ID:', agentParticipant.id);
             console.log('[QueueMonitor] Transfer body:', transferBody);
             
             const result = await this.conversationsApi.postConversationParticipantReplaceQueue(
                 this.currentConversationId,
-                callerParticipant.id,
+                agentParticipant.id,
                 transferBody
             );
             
