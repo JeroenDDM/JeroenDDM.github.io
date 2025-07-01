@@ -1575,20 +1575,29 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
         try {
             this.showTransferStatus('Initiating blind transfer...');
             
-            // Prepare transfer request
-            const transferRequest = {
-                transferType: 'Blind',
-                destination: {
-                    queueId: this.selectedQueue.id
-                }
+            console.log('[QueueMonitor] Performing blind transfer to queue:', this.selectedQueue.name);
+            
+            // Execute the blind transfer using Conversations API
+            // For blind transfers to queue, use postConversationsCallParticipantReplaceQueue
+            // We need to get the participant ID first
+            const conversationDetails = await this.conversationsApi.getConversationsCall(this.currentConversationId);
+            const agentParticipant = conversationDetails.participants.find(p => p.purpose === 'agent' && p.state === 'connected');
+            
+            if (!agentParticipant) {
+                throw new Error('Could not find connected agent participant');
+            }
+            
+            const transferBody = {
+                queueId: this.selectedQueue.id
             };
             
-            console.log('[QueueMonitor] Performing blind transfer:', transferRequest);
+            console.log('[QueueMonitor] Using participant ID:', agentParticipant.id);
+            console.log('[QueueMonitor] Transfer body:', transferBody);
             
-            // Execute the transfer using Conversations API
-            const result = await this.conversationsApi.postConversationTransfer(
-                this.currentConversationId, 
-                transferRequest
+            const result = await this.conversationsApi.postConversationsCallParticipantReplaceQueue(
+                this.currentConversationId,
+                agentParticipant.id,
+                transferBody
             );
             
             console.log('[QueueMonitor] Transfer successful:', result);
@@ -1628,20 +1637,29 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
         try {
             this.showTransferStatus('Initiating consult transfer...');
             
-            // Prepare consult transfer request
-            const consultRequest = {
-                transferType: 'Consult',
-                destination: {
-                    queueId: this.selectedQueue.id
-                }
-            };
-            
-            console.log('[QueueMonitor] Performing consult transfer:', consultRequest);
+            console.log('[QueueMonitor] Performing consult transfer to queue:', this.selectedQueue.name);
             
             // Execute the consult transfer using Conversations API
-            const result = await this.conversationsApi.postConversationTransfer(
-                this.currentConversationId, 
-                consultRequest
+            // For consult transfers to queue, use postConversationsCallParticipantConsultQueue
+            // We need to get the participant ID first
+            const conversationDetails = await this.conversationsApi.getConversationsCall(this.currentConversationId);
+            const agentParticipant = conversationDetails.participants.find(p => p.purpose === 'agent' && p.state === 'connected');
+            
+            if (!agentParticipant) {
+                throw new Error('Could not find connected agent participant');
+            }
+            
+            const consultBody = {
+                queueId: this.selectedQueue.id
+            };
+            
+            console.log('[QueueMonitor] Using participant ID:', agentParticipant.id);
+            console.log('[QueueMonitor] Consult body:', consultBody);
+            
+            const result = await this.conversationsApi.postConversationsCallParticipantConsultQueue(
+                this.currentConversationId,
+                agentParticipant.id,
+                consultBody
             );
             
             console.log('[QueueMonitor] Consult transfer initiated:', result);
