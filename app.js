@@ -1588,7 +1588,9 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             }
             
             const transferBody = {
-                queueId: this.selectedQueue.id
+                speakTo: "DESTINATION",
+                queueId: this.selectedQueue.id,
+                queueName: this.selectedQueue.name
             };
             
             console.log('[QueueMonitor] Using participant ID:', agentParticipant.id);
@@ -1650,7 +1652,9 @@ Note: Transfer functionality is only available when running as a Genesys Cloud i
             }
             
             const consultBody = {
-                queueId: this.selectedQueue.id
+                speakTo: "DESTINATION",
+                queueId: this.selectedQueue.id,
+                queueName: this.selectedQueue.name
             };
             
             console.log('[QueueMonitor] Using participant ID:', agentParticipant.id);
