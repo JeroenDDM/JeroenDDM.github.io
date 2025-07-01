@@ -291,29 +291,11 @@ class QueueMonitor {
                                     console.log('[QueueMonitor] Current URL hash:', hash ? hash.substring(0, 100) + '...' : 'none');
                                     console.log('[QueueMonitor] Current URL search:', search);
                     
-                    // Try Platform Client SDK implicit grant authentication
+                    // For widgets, we don't typically have OAuth responses in the URL hash
+                    // Widgets inherit authentication from the parent Genesys Cloud application
                     if (hash && (hash.includes('access_token') || hash.includes('error'))) {
-                        console.log('[QueueMonitor] Found OAuth response in URL hash - processing with Platform Client SDK...');
-                        
-                        try {
-                            // Use Platform Client SDK to handle the implicit grant response
-                            const authData = await client.loginImplicitGrant();
-                            console.log('[QueueMonitor] ✅ Platform Client SDK implicit grant successful');
-                            console.log('[QueueMonitor] Authentication data received:', {
-                                hasAccessToken: !!authData.accessToken,
-                                hasTokenType: !!authData.tokenType,
-                                hasExpiresIn: !!authData.expiresIn,
-                                expiresIn: authData.expiresIn,
-                                hasState: !!authData.state
-                            });
-                            
-                            this.updateConnectionStatus('connected', 'Connected via Platform Client SDK');
-                            return { success: true };
-                            
-                        } catch (implicitGrantError) {
-                            console.log('[QueueMonitor] Platform Client SDK implicit grant failed:', implicitGrantError.message);
-                            console.log('[QueueMonitor] Trying manual token extraction...');
-                        }
+                        console.log('[QueueMonitor] Found OAuth response in URL hash - this is unusual for widgets');
+                        console.log('[QueueMonitor] Widgets typically inherit authentication from parent Genesys Cloud app');
                     }
                     
                     // Manual token extraction as fallback
@@ -332,12 +314,12 @@ class QueueMonitor {
                         }
                     }
                     
-                    // Method 2: Try to get from Client App SDK
+                    // Method 2: Try to get authentication from Client App SDK or parent window
                     if (!accessToken && this.clientApp) {
-                        console.log('[QueueMonitor] Trying Client App SDK token extraction...');
+                        console.log('[QueueMonitor] Trying Client App SDK and parent window authentication...');
                         console.log('[QueueMonitor] Client App SDK available properties:', Object.keys(this.clientApp));
                         
-                        // Try multiple ways to get the token from Client App SDK
+                        // First, try to get the access token from various Client App SDK sources
                         if (this.clientApp._accessToken) {
                             accessToken = this.clientApp._accessToken;
                             console.log('[QueueMonitor] ✅ Token from Client App SDK _accessToken');
@@ -347,8 +329,10 @@ class QueueMonitor {
                         } else if (this.clientApp.authentication && this.clientApp.authentication.token) {
                             accessToken = this.clientApp.authentication.token;
                             console.log('[QueueMonitor] ✅ Token from Client App SDK authentication.token');
-                        } else {
-                            // Try to get token from Client App SDK's internal platform client
+                        }
+                        
+                        // Try to get token from Client App SDK's internal platform client
+                        if (!accessToken) {
                             try {
                                 if (this.clientApp._platformClient || this.clientApp.platformClient) {
                                     const internalClient = this.clientApp._platformClient || this.clientApp.platformClient;
@@ -365,10 +349,36 @@ class QueueMonitor {
                             } catch (internalTokenError) {
                                 console.log('[QueueMonitor] Could not get token from internal platform client:', internalTokenError.message);
                             }
-                            
-                            if (!accessToken) {
-                                console.log('[QueueMonitor] No token found in Client App SDK');
+                        }
+                        
+                        // Try to get token from parent window (Genesys Cloud app)
+                        if (!accessToken && window.parent !== window) {
+                            try {
+                                console.log('[QueueMonitor] Trying to get token from parent Genesys Cloud window...');
+                                
+                                // Check if parent window has PureCloud global object
+                                if (window.parent.purecloud) {
+                                    const parentPureCloud = window.parent.purecloud;
+                                    console.log('[QueueMonitor] Found purecloud object in parent window');
+                                    
+                                    // Try to get token from parent's platform client
+                                    if (parentPureCloud.platformClient && parentPureCloud.platformClient.ApiClient) {
+                                        const parentClient = parentPureCloud.platformClient.ApiClient.instance;
+                                        const parentToken = parentClient.authentications?.['PureCloud OAuth']?.accessToken ||
+                                                          parentClient.authentications?.PureCloud?.accessToken;
+                                        if (parentToken) {
+                                            accessToken = parentToken;
+                                            console.log('[QueueMonitor] ✅ Token from parent window platform client');
+                                        }
+                                    }
+                                }
+                            } catch (parentError) {
+                                console.log('[QueueMonitor] Cannot access parent window (cross-origin):', parentError.message);
                             }
+                        }
+                        
+                        if (!accessToken) {
+                            console.log('[QueueMonitor] No access token found in Client App SDK or parent window');
                         }
                     }
                     
@@ -395,10 +405,67 @@ class QueueMonitor {
                         return { success: true };
                         
                     } else {
-                        console.log('[QueueMonitor] ⚠️  No access token found - configuring for widget context');
+                        console.log('[QueueMonitor] ⚠️  No access token found - trying alternative widget authentication approaches');
                         
-                        // Configure Platform Client for widget context without explicit token
-                        // Sometimes widgets work with implicit browser authentication
+                        // Alternative approach: Copy authentication from Client App SDK's internal client
+                        if (this.clientApp && (this.clientApp._platformClient || this.clientApp.platformClient)) {
+                            try {
+                                const internalClient = this.clientApp._platformClient || this.clientApp.platformClient;
+                                console.log('[QueueMonitor] Attempting to copy authentication from Client App SDK internal client...');
+                                
+                                if (internalClient.ApiClient && internalClient.ApiClient.instance) {
+                                    const internalApiClient = internalClient.ApiClient.instance;
+                                    
+                                    // Copy authentication settings from internal client
+                                    if (internalApiClient.authentications) {
+                                        console.log('[QueueMonitor] Copying authentication settings from internal client...');
+                                        
+                                        // Copy the authentication objects
+                                        Object.keys(internalApiClient.authentications).forEach(authType => {
+                                            if (client.authentications && client.authentications[authType]) {
+                                                const internalAuth = internalApiClient.authentications[authType];
+                                                const clientAuth = client.authentications[authType];
+                                                
+                                                // Copy authentication properties
+                                                if (internalAuth.accessToken) {
+                                                    clientAuth.accessToken = internalAuth.accessToken;
+                                                    console.log('[QueueMonitor] ✅ Copied access token for', authType);
+                                                }
+                                                if (internalAuth.apiKey) {
+                                                    clientAuth.apiKey = internalAuth.apiKey;
+                                                    console.log('[QueueMonitor] ✅ Copied API key for', authType);
+                                                }
+                                                if (internalAuth.apiKeyPrefix) {
+                                                    clientAuth.apiKeyPrefix = internalAuth.apiKeyPrefix;
+                                                }
+                                            }
+                                        });
+                                        
+                                        // Set the same default authentication
+                                        if (internalApiClient.defaultAuthentication) {
+                                            client.defaultAuthentication = internalApiClient.defaultAuthentication;
+                                            console.log('[QueueMonitor] ✅ Set default authentication to:', client.defaultAuthentication);
+                                        }
+                                        
+                                        // Copy headers if available
+                                        if (internalApiClient.defaultHeaders) {
+                                            client.defaultHeaders = client.defaultHeaders || {};
+                                            Object.assign(client.defaultHeaders, internalApiClient.defaultHeaders);
+                                            console.log('[QueueMonitor] ✅ Copied default headers');
+                                        }
+                                        
+                                        console.log('[QueueMonitor] ✅ Authentication copied from Client App SDK internal client');
+                                        this.updateConnectionStatus('connected', 'Connected (Copied Authentication)');
+                                        return { success: true };
+                                    }
+                                }
+                            } catch (copyError) {
+                                console.log('[QueueMonitor] Failed to copy authentication from internal client:', copyError.message);
+                            }
+                        }
+                        
+                        // Final fallback: Configure Platform Client for widget context without explicit token
+                        console.log('[QueueMonitor] Using fallback widget context authentication...');
                         if (client.authentications && client.authentications['PureCloud OAuth']) {
                             client.defaultAuthentication = 'PureCloud OAuth';
                             console.log('[QueueMonitor] Set default authentication to PureCloud OAuth');
@@ -408,7 +475,6 @@ class QueueMonitor {
                         }
                         
                         console.log('[QueueMonitor] Available authentication methods:', Object.keys(client.authentications || {}));
-                        
                         console.log('[QueueMonitor] ⚠️  Widget context authentication configured - may work with browser session');
                         this.updateConnectionStatus('connected', 'Connected (Widget Context)');
                         return { success: true };
