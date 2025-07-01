@@ -12,6 +12,9 @@ class QueueMonitor {
         this.currentSearchTerm = '';
         this.currentConversationId = null;
         this.selectedQueue = null;
+        this.urlParams = {}; // Store URL parameters for widget context
+        this.isWidgetMode = false; // Track if we're running in widget mode
+        this.isStandalone = true; // Track if we're running in standalone mode
         
         // OAuth Configuration - Replace with your actual OAuth app details
         this.oauthConfig = {
@@ -112,6 +115,9 @@ class QueueMonitor {
             
             this.updateConnectionStatus('connecting', 'Authenticating...');
             
+            // CRITICAL: Check for preserved widget context after OAuth redirect
+            this.checkForPreservedWidgetContext();
+            
             // Check if we're in a Genesys Cloud environment by looking for query parameters
             const urlParams = new URLSearchParams(window.location.search);
             const hasGenesysQueryParams = urlParams.has('gcHostOrigin') || 
@@ -158,14 +164,21 @@ class QueueMonitor {
             console.log('[QueueMonitor] === END URL INTERPOLATION ANALYSIS ===');
             console.log('[QueueMonitor] ');
             
-            console.log('[QueueMonitor] URL parameters found:', {
+            // Store URL parameters for widget context preservation
+            this.urlParams = {
                 gcHostOrigin: urlParams.get('gcHostOrigin'),
                 gcTargetEnv: urlParams.get('gcTargetEnv'),
+                conversationId: urlParams.get('conversationId'),
+                langTag: urlParams.get('langTag'),
                 pcEnvironment: urlParams.get('pcEnvironment'),
                 environment: urlParams.get('environment'),
                 iid: urlParams.get('iid'),
                 host: urlParams.get('host'),
-                locale: urlParams.get('locale'),
+                locale: urlParams.get('locale')
+            };
+            
+            console.log('[QueueMonitor] URL parameters found:', {
+                ...this.urlParams,
                 hostname: window.location.hostname,
                 isInIframe: isInIframe,
                 hasGenesysQueryParams: hasGenesysQueryParams,
@@ -504,6 +517,22 @@ class QueueMonitor {
                         // Try Platform Client SDK implicit grant authentication as fallback
                         console.log('[QueueMonitor] Trying Platform Client SDK implicit grant authentication...');
                         try {
+                            // CRITICAL: Save widget context before OAuth redirect
+                            console.log('[QueueMonitor] 🔄 Preserving widget context before OAuth redirect...');
+                            const widgetContext = {
+                                gcHostOrigin: this.urlParams.gcHostOrigin,
+                                gcTargetEnv: this.urlParams.gcTargetEnv,
+                                conversationId: this.urlParams.conversationId,
+                                langTag: this.urlParams.langTag,
+                                originalUrl: window.location.href,
+                                timestamp: Date.now(),
+                                isWidgetMode: this.isWidgetMode
+                            };
+                            
+                            // Store in localStorage to survive OAuth redirect
+                            localStorage.setItem('genesys-widget-context', JSON.stringify(widgetContext));
+                            console.log('[QueueMonitor] 💾 Widget context saved to localStorage:', widgetContext);
+                            
                             const clientId = '110d379d-9f0d-452f-8706-e8975a058f7f';
                             const redirectUri = 'https://jeroenddm.github.io/';
                             const state = 'queue-monitor-widget-' + Date.now();
@@ -580,6 +609,73 @@ class QueueMonitor {
             console.error('[QueueMonitor] Authentication failed:', error);
             this.updateConnectionStatus('error', 'Authentication failed');
             return { success: false, reason: 'authentication_error', error: error.message };
+        }
+    }
+
+    checkForPreservedWidgetContext() {
+        try {
+            console.log('[QueueMonitor] 🔍 Checking for preserved widget context...');
+            
+            // Check if we have OAuth token in URL hash (indicates OAuth redirect)
+            const hash = window.location.hash;
+            const hasOAuthToken = hash && hash.includes('access_token');
+            
+            if (hasOAuthToken) {
+                console.log('[QueueMonitor] 🔄 OAuth redirect detected - checking for preserved context');
+                
+                // Try to restore widget context from localStorage
+                const preservedContext = localStorage.getItem('genesys-widget-context');
+                if (preservedContext) {
+                    try {
+                        const widgetContext = JSON.parse(preservedContext);
+                        console.log('[QueueMonitor] 📥 Found preserved widget context:', widgetContext);
+                        
+                        // Check if context is recent (within last 10 minutes)
+                        const contextAge = Date.now() - widgetContext.timestamp;
+                        const maxAge = 10 * 60 * 1000; // 10 minutes
+                        
+                        if (contextAge < maxAge) {
+                            console.log('[QueueMonitor] ✅ Preserved context is recent, restoring widget mode...');
+                            
+                            // Restore widget parameters
+                            this.urlParams = {
+                                gcHostOrigin: widgetContext.gcHostOrigin,
+                                gcTargetEnv: widgetContext.gcTargetEnv,
+                                conversationId: widgetContext.conversationId,
+                                langTag: widgetContext.langTag
+                            };
+                            
+                            // Restore widget mode flags
+                            this.isWidgetMode = widgetContext.isWidgetMode;
+                            this.isStandalone = !widgetContext.isWidgetMode;
+                            
+                            console.log('[QueueMonitor] 🎯 Widget context restored successfully!');
+                            console.log('[QueueMonitor] Widget Mode:', this.isWidgetMode);
+                            console.log('[QueueMonitor] Conversation ID:', this.urlParams.conversationId);
+                            console.log('[QueueMonitor] Host Origin:', this.urlParams.gcHostOrigin);
+                            
+                            // Clean up localStorage after successful restore
+                            localStorage.removeItem('genesys-widget-context');
+                            console.log('[QueueMonitor] 🧹 Cleaned up preserved context from localStorage');
+                            
+                        } else {
+                            console.log('[QueueMonitor] ⏰ Preserved context is too old (', Math.round(contextAge / 1000), 'seconds), ignoring');
+                            localStorage.removeItem('genesys-widget-context');
+                        }
+                        
+                    } catch (parseError) {
+                        console.log('[QueueMonitor] ❌ Failed to parse preserved context:', parseError.message);
+                        localStorage.removeItem('genesys-widget-context');
+                    }
+                } else {
+                    console.log('[QueueMonitor] ℹ️  No preserved widget context found in localStorage');
+                }
+            } else {
+                console.log('[QueueMonitor] ℹ️  No OAuth redirect detected, skipping context restoration');
+            }
+            
+        } catch (error) {
+            console.log('[QueueMonitor] ❌ Error checking preserved widget context:', error.message);
         }
     }
 
