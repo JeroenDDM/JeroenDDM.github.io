@@ -18,9 +18,10 @@ class QueueMonitor {
         
         // OAuth Configuration - Replace with your actual OAuth app details
         this.oauthConfig = {
-            clientId: '110d379d-9f0d-452f-8706-e8975a058f7f', // Replace with your OAuth client ID
+            // clientId: '110d379d-9f0d-452f-8706-e8975a058f7f', // DDM env clientID
+            clientId: '59be7a7f-6eee-4fdf-ba28-1939357e9682', // Replace with your OAuth client ID
             redirectUri: 'https://jeroenddm.github.io/', // Current page
-            environment: 'mypurecloud.ie', // Your Genesys Cloud environment
+            environment: 'mypurecloud.de', // Your Genesys Cloud environment
             scopes: ['routing', 'analytics', 'conversations'] // Required permissions
         };
         
